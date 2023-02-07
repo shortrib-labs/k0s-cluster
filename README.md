@@ -1,14 +1,15 @@
-# vSphere kURL Cluster
+# vSphere k0s Cluster
 
-Easily create a Kubernetes cluster on vSphere using [kURL](https://kurl.sh)
+Easily create a Kubernetes cluster on vSphere using [k0s](https://k0sproject.io)
 and [Terraform](https://terraform.io)
 
 ## Goals and Audience
 
-I created this project as a simple way to spin up a single-node
+I created this project as a simple way to spin up a single-node kURL
 cluster on my home lab so that I could play with [KOTS](https://kots.io).
 As I worked with it, I realized I could use to create multi-node
-clusters or to install KOTS software using an embedded clusters.
+clusters. Then I learned about k0s and decided to see if I could adapt
+what I was doing to building k0s clusters.
 
 The initial audience was me and my peers at Replicated, but I think
 anyone working needing small clusters in a Lab environment could find
