@@ -1,5 +1,3 @@
-#@ load("@ytt:data", "data")
----
 #cloud-config
 
 # This is the user-data configuration file for cloud-init. By default this sets
@@ -15,7 +13,7 @@
 prefer_fqdn_over_hostname: true
 
 ssh_authorized_keys: 
-- #@ data.values.ssh.authorized_key
+${ssh_authorized_keys}
 
 chpasswd:
   expire: false
@@ -31,19 +29,8 @@ packages:
 groups:
 - ssher
 
-users:
-- default
-- name: crdant
-  gecos: "Chuck D'Antonio"
-  groups:
-  - users 
-  - adm 
-  - sudo
-  - ssher
-  ssh_import_id: 
-  - gh:crdant
-  sudo: "ALL=(ALL) NOPASSWD:ALL"
-  lock_passwd: true
+users: 
+${users}
 
 # Update apt database and upgrade packages on first boot
 package_update: true
@@ -95,3 +82,4 @@ write_files:
 ### Run arbitrary commands at rc.local like time
 runcmd:
 - [ chsh, -s, /usr/bin/zsh, crdant ]
+- echo "# limit who can use SSH\nAllowGroups ssher" > /etc/ssh/sshd_config.d/02-limit-to-ssher.conf
