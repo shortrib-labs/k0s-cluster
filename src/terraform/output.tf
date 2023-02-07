@@ -3,16 +3,10 @@ output "password" {
   sensitive = true
 }
 
-output "node_ip" {
-  value     = vsphere_virtual_machine.control_plane.default_ip_address
+output "control_plane_ips" {
+  value     = [ for controller in vsphere_virtual_machine.control_plane : controller.default_ip_address ]
 }
 
-output "join_script" {
-  value     = data.external.join_script.result["script"]
-  sensitive = true
-}
-
-output "kubeconfig" {
-  value     = data.external.kubeconfig.result["config"]
-  sensitive = true
+output "worker_ips" {
+  value     = [ for worker in vsphere_virtual_machine.worker : worker.default_ip_address ]
 }

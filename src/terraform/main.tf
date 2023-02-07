@@ -32,10 +32,12 @@ resource "random_pet" "default_password" {
 }
 
 locals {
-  user_data = <<-DATA
-  #cloud-config
-  ${data.carvel_ytt.user_data.result}
-  DATA
+  user_data = templatefile("${local.directories.templates}/user-data.tftpl",
+                             {
+                               ssh_authorized_keys = yamlencode(var.ssh_authorized_keys)
+                               users = yamlencode(local.users)
+                             }
+                          )
 }
 
 resource "random_id" "control_plane" {
@@ -45,6 +47,7 @@ resource "random_id" "control_plane" {
 
 resource "vsphere_virtual_machine" "control_plane" {
   name     = "${local.vm_prefix}-control-plane-${random_id.control_plane.hex}"
+  count    = var.controllers
 
   datacenter_id    = data.vsphere_datacenter.datacenter.id
   datastore_id     = data.vsphere_datastore.datastore.id
@@ -79,12 +82,7 @@ resource "vsphere_virtual_machine" "control_plane" {
       "instance-id" = "id-${local.vm_prefix}-control-plane-${random_id.control_plane.hex}"
       "hostname"    = local.vm_prefix
       "password"    = random_pet.default_password.id
-      "user-data"   = base64encode(<<-DATA
-                      #cloud-config
-                      fqdn: ${local.server_name}
-                      ${data.carvel_ytt.user_data.result}
-                      DATA
-                      )
+      "user-data"   = base64encode(local.user_data)
     }
   }
 
@@ -102,45 +100,6 @@ resource "vsphere_virtual_machine" "control_plane" {
     "isolation.tools.paste.disable"        = "FALSE"
     "isolation.tools.SetGUIOptions.enable" = "TRUE"
   }
-
-  provisioner "remote-exec" { 
-    inline = [ 
-      var.kurl_script, 
-      "curl -o tasks.sh https://kurl.sh/latest/tasks.sh && sudo bash tasks.sh generate-admin-user"
-    ] 
-    connection {
-      user = "ubuntu"
-      host = self.default_ip_address
-    }
-  }
-
-  provisioner "file" {
-    source      = "${var.project_root}/src/bash/join_script_data_source.sh"
-    destination = "/tmp/join_script_data_source.sh"
-    connection {
-      user = "ubuntu"
-      host = self.default_ip_address
-    }
-  }
-
-  provisioner "remote-exec" { 
-    inline = [ 
-      "echo '# limit who can use SSH\nAllowGroups ssher' | sudo tee /etc/ssh/sshd_config.d/02-limit-to-ssher.conf"
-    ] 
-    connection {
-      user = "ubuntu"
-      host = self.default_ip_address
-    }
-  }
-}
-
-data "external" "join_script" {
-  program = [
-    "ssh",
-    "-oStrictHostKeyChecking=no",
-    vsphere_virtual_machine.control_plane.default_ip_address,
-    "bash /tmp/join_script_data_source.sh"
-  ]
 }
 
 resource "random_id" "worker" {
@@ -185,13 +144,7 @@ resource "vsphere_virtual_machine" "worker" {
       "instance-id" = "id-${local.vm_prefix}-worker-${random_id.worker[count.index].hex}"
       "hostname"    = "${local.vm_prefix}-worker-${random_id.worker[count.index].hex}"
       "password"    = random_pet.default_password.id
-      "user-data"   = base64encode(<<-DATA
-                      #cloud-config
-                      hostname: ${local.vm_prefix}-worker-${random_id.worker[count.index].hex}
-                      fqdn: ${local.vm_prefix}-worker-${random_id.worker[count.index].hex}.${var.domain}
-                      ${data.carvel_ytt.user_data.result}
-                      DATA
-                      )
+      "user-data"   = base64encode(local.user_data)
     }
   }
 
@@ -210,24 +163,5 @@ resource "vsphere_virtual_machine" "worker" {
     "isolation.tools.SetGUIOptions.enable" = "TRUE"
   }
 
-  provisioner "remote-exec" { 
-    inline = [
-      data.external.join_script.result["script"]
-    ] 
-    connection {
-      user = "ubuntu"
-      host = self.default_ip_address
-    }
-  }
-
-  provisioner "remote-exec" { 
-    inline = [ 
-      "echo '# limit who can use SSH\nAllowGroups ssher' | sudo tee /etc/ssh/sshd_config.d/02-limit-to-ssher.conf"
-    ] 
-    connection {
-      user = "ubuntu"
-      host = self.default_ip_address
-    }
-  }
 }
 

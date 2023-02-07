@@ -10,8 +10,14 @@ variable "domain" {
   type = string
 }
 
+variable "controllers" {
+  type = string
+  default = 1
+}
+
 variable "workers" {
   type = string
+  default = 0
 }
 
 variable "remote_ovf_url" {
@@ -22,9 +28,8 @@ variable "ssh_authorized_keys" {
   type = list
 }
 
-variable "worker_count" {
+variable "users" {
   type = string
-  default = 0
 }
 
 variable "cpus" {
@@ -82,16 +87,14 @@ variable "vsphere_folder" {
   type = string
 }
 
-variable "kurl_script" {
-  type = string
-}
-
 locals {
-  vm_prefix      = "${var.cluster_name}"
+  vm_prefix      = var.cluster_name
   server_name    = "${var.cluster_name}.${var.domain}"
   vsphere_folder = "${var.vsphere_datacenter}/vm/${var.vsphere_folder}"
+  users = jsondecode(var.users)
   directories = {
     work = "${var.project_root}/work"
     secrets = "${var.project_root}/secrets"
+    templates = "${path.module}/templates"
   }
 }
