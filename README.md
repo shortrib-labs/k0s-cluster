@@ -24,8 +24,9 @@ it use full.
 * Make
 * Terraform
 * Direnv
-* Python (for secrets management, see below)
-* GPG (also fro secrets management)
+* SOPS (for secrets management)
+* GPG (for SOPS)
+* [`k0sctl`](https://github.com/k0sproject/k0sctl#installation)
 
 ## Customizing for Your Environment
 
@@ -94,3 +95,5 @@ $ make decrypt
 ```
 
 to decrypt it.
+
+You can also edit it directly with `sops ${SECRETS_DIR}/params.yaml`.
