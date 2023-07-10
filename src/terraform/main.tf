@@ -22,8 +22,13 @@ data "vsphere_host" "host" {
   datacenter_id = data.vsphere_datacenter.datacenter.id
 }
 
-data "vsphere_network" "network" {
-  name          = var.vsphere_network
+data "vsphere_network" "kubernetes_network" {
+  name          = var.kubernetes_network
+  datacenter_id = data.vsphere_datacenter.datacenter.id
+}
+
+data "vsphere_network" "workload_network" {
+  name          = var.workload_network
   datacenter_id = data.vsphere_datacenter.datacenter.id
 }
 
@@ -60,7 +65,11 @@ resource "vsphere_virtual_machine" "control_plane" {
   guest_id = "ubuntu64Guest"
 
   network_interface {
-    network_id     = data.vsphere_network.network.id
+    network_id     = data.kubernetes_network.network.id
+  }
+
+  network_interface {
+    network_id     = data.workload_network.network.id
   }
 
   disk {
@@ -122,7 +131,11 @@ resource "vsphere_virtual_machine" "worker" {
   guest_id = "ubuntu64Guest"
 
   network_interface {
-    network_id     = data.vsphere_network.network.id
+    network_id     = data.kubernetes_network.network.id
+  }
+
+  network_interface {
+    network_id     = data.workload_network.network.id
   }
 
   disk {

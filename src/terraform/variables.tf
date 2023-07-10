@@ -75,7 +75,11 @@ variable "vsphere_datastore" {
   type = string
 }
 
-variable "vsphere_network" {
+variable "kubernetes_network" {
+  type = string
+}
+
+variable "workload_network" {
   type = string
 }
 

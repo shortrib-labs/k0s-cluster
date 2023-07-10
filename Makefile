@@ -29,7 +29,8 @@ vsphere_cluster				= "$(shell yq .vsphere.cluster $(params_yaml))"
 vsphere_host					= "$(shell yq .vsphere.host $(params_yaml))"
 vsphere_resource_pool = "$(shell yq .vsphere.resource_pool $(params_yaml))"
 
-vsphere_network	  = "$(shell yq .vsphere.network $(params_yaml))"
+kubernetes_network	  = "$(shell yq .vsphere.kubernetes_network $(params_yaml))"
+workload_network	  = "$(shell yq .vsphere.workload_network $(params_yaml))"
 vsphere_datastore = "$(shell yq .vsphere.datastore $(params_yaml))"
 vsphere_folder	  = "$(shell yq .vsphere.folder $(params_yaml))"
 endef
