@@ -63,13 +63,16 @@ resource "vsphere_virtual_machine" "control_plane" {
   num_cpus = var.cpus
   memory   = var.memory
   guest_id = "ubuntu64Guest"
+  hardware_version = 19
 
   network_interface {
-    network_id     = data.kubernetes_network.network.id
+    network_id     = data.vsphere_network.kubernetes_network.id
+    use_static_mac = true
+    mac_address    = var.control_plane_mac[count.index]
   }
 
   network_interface {
-    network_id     = data.workload_network.network.id
+    network_id     = data.vsphere_network.workload_network.id
   }
 
   disk {
@@ -81,6 +84,8 @@ resource "vsphere_virtual_machine" "control_plane" {
 
     thin_provisioned = true
   }
+  enable_disk_uuid = true
+
 
   cdrom {
     client_device = true
@@ -100,7 +105,7 @@ resource "vsphere_virtual_machine" "control_plane" {
     allow_unverified_ssl_cert = true
 
     ip_protocol          = "IPV4"
-    ip_allocation_policy = "DHCP"
+    ip_allocation_policy = "STATIC_MANUAL"
     disk_provisioning    = "thin"
   }
 
@@ -109,6 +114,7 @@ resource "vsphere_virtual_machine" "control_plane" {
     "isolation.tools.paste.disable"        = "FALSE"
     "isolation.tools.SetGUIOptions.enable" = "TRUE"
   }
+
 }
 
 resource "random_id" "worker" {
@@ -129,13 +135,14 @@ resource "vsphere_virtual_machine" "worker" {
   num_cpus = var.cpus
   memory   = var.memory
   guest_id = "ubuntu64Guest"
+  hardware_version = 19
 
   network_interface {
-    network_id     = data.kubernetes_network.network.id
+    network_id     = data.vsphere_network.kubernetes_network.id
   }
 
   network_interface {
-    network_id     = data.workload_network.network.id
+    network_id     = data.vsphere_network.workload_network.id
   }
 
   disk {
@@ -147,6 +154,7 @@ resource "vsphere_virtual_machine" "worker" {
 
     thin_provisioned = true
   }
+  enable_disk_uuid = true
 
   cdrom {
     client_device = true

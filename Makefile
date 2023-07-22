@@ -19,6 +19,9 @@ workers     = "$(shell yq .cluster.workers $(params_yaml))"
 cpus			= "$(shell yq .node.cpus $(params_yaml))"
 memory		= "$(shell yq .node.memory $(params_yaml))"
 disk_size = "$(shell yq .node.disk_size $(params_yaml))"
+control_plane_cidr	  = "$(shell yq .cluster.control_plane_cidr $(params_yaml))"
+control_plane_mac     = $(shell yq --output-format json .cluster.control_plane_mac $(params_yaml))
+load_balancer_cidr	  = "$(shell yq .cluster.load_balancer_cidr $(params_yaml))"
 
 vsphere_server    = "$(shell yq .vsphere.server $(params_yaml))"
 vsphere_username  = "$(shell yq .vsphere.username $(params_yaml))"
@@ -33,6 +36,9 @@ kubernetes_network	  = "$(shell yq .vsphere.kubernetes_network $(params_yaml))"
 workload_network	  = "$(shell yq .vsphere.workload_network $(params_yaml))"
 vsphere_datastore = "$(shell yq .vsphere.datastore $(params_yaml))"
 vsphere_folder	  = "$(shell yq .vsphere.folder $(params_yaml))"
+
+tailnet           = "$(shell yq .tailscale.tailnet $(params_yaml))"
+tailscale_api_key = "$(shell sops --decrypt --extract '["tailscale"]["api-key"]' $(params_yaml))"
 endef
 
 .PHONY: tfvars
@@ -46,14 +52,18 @@ $(tfvars): $(params_yaml)
 init: $(tfvars)
 	@(cd $(SOURCE_DIR)/terraform && terraform init)
 
-.PHONY: create
+.PHONY: nodes
 nodes: $(tfvars)
 	@(cd ${SOURCE_DIR}/terraform && terraform apply -var-file $(tfvars) --auto-approve)
 
 .PHONY: cluster
 cluster: nodes
+	@mkdir -p work/manifests
+	@sops --decrypt ${SECRETS_DIR}/cloudflare-api-token.yaml > ${WORK_DIR}/manifests/01-cloudflare-api-token.yaml
+	@sops --decrypt ${SECRETS_DIR}/tailscale-authkey.yaml > ${WORK_DIR}/manifests/01-tailscale-authkey.yaml
 	@k0sctl apply --config ${SECRETS_DIR}/k0sctl.yaml
 	@k0sctl kubeconfig --config ${SECRETS_DIR}/k0sctl.yaml > ${SECRETS_DIR}/kubeconfig
+	@rm -rf work/manifests
 
 .PHONY: test
 test: $(tfvars)

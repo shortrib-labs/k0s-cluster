@@ -8,7 +8,50 @@ spec:
   - ssh:
       address: ${controller}
       user: ${user}
-    role: controller
+    role: controller+worker
+    %{ if controller == first_controller }
+    files:
+    - name: vsphere-csi
+      src: ${manifest_dir}/vsphere-csi/*.yaml
+      dstDir: /var/lib/k0s/manifests/vsphere-csi
+      perm: 0600
+      dirPerm: 0755
+    - name: vsphere-csi-conf.yaml
+      src: ${work_dir}/manifests/01-vsphere-csi-config.yaml
+      dstDir: /var/lib/k0s/manifests/vsphere-csi
+      perm: 0600
+      dirPerm: 0755
+    - name: metallb-config
+      src: ${work_dir}/manifests/00-default-ipaddresspool.yaml
+      dstDir: /var/lib/k0s/manifests/metallb-config
+      perm: 0600
+      dirPerm: 0755
+    - name: cert-manager
+      src: ${manifest_dir}/cert-manager/*.yaml
+      dstDir: /var/lib/k0s/manifests/cert-manager
+      perm: 0600
+      dirPerm: 0755
+    - name: cloudflare-api-token.yaml
+      src: ${work_dir}/manifests/01-cloudflare-api-token.yaml
+      dstDir: /var/lib/k0s/manifests/letsencrypt
+      perm: 0600
+    - name: letsencrypt
+      src: ${manifest_dir}/letsencrypt/*
+      dstDir: /var/lib/k0s/manifests/letsencrypt
+      perm: 0600
+    - name: tailscaled
+      src: ${manifest_dir}/tailscaled/*.yaml
+      dstDir: /var/lib/k0s/manifests/tailscaled
+      perm: 0600
+    - name: tailscale-authkey.yaml
+      src: ${work_dir}/manifests/01-tailscale-authkey.yaml
+      dstDir: /var/lib/k0s/manifests/tailscaled
+      perm: 0600
+    - name: tailscale-proxy.yaml
+      src: ${work_dir}/manifests/02-tailscale-proxy.yaml
+      dstDir: /var/lib/k0s/manifests/tailscaled
+      perm: 0600
+    %{ endif }
   %{ endfor }
   %{ for worker in workers }
   - ssh:
@@ -62,7 +105,15 @@ spec:
             repositories:
             - name: metallb
               url: https://metallb.github.io/metallb
+            - name: bitnami
+              url: https://charts.bitnami.com/bitnami
+            - name: jetstack
+              url: https://charts.jetstack.io
             charts:
             - name: metallb
               chartname: metallb/metallb
               namespace: metallb
+            - name: projectcontour
+              chartname: bitnami/contour
+              namespace: projectcontour
+

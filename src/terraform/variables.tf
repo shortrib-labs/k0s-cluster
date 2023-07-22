@@ -32,6 +32,19 @@ variable "users" {
   type = string
 }
 
+variable "control_plane_mac" {
+  type = list
+}
+
+variable "control_plane_cidr" {
+  type = string
+}
+
+variable "load_balancer_cidr" {
+  type = string
+}
+
+
 variable "cpus" {
   type    = number
   default = 4
@@ -91,14 +104,23 @@ variable "vsphere_folder" {
   type = string
 }
 
+variable "tailnet" {
+  type = string
+}
+
+variable "tailscale_api_key" {
+  type = string
+}
+
 locals {
   vm_prefix      = var.cluster_name
   server_name    = "${var.cluster_name}.${var.domain}"
   vsphere_folder = "${var.vsphere_datacenter}/vm/${var.vsphere_folder}"
   users = jsondecode(var.users)
   directories = {
-    work = "${var.project_root}/work"
-    secrets = "${var.project_root}/secrets"
+    secrets   = "${var.project_root}/secrets"
+    manifests = "${var.project_root}/manifests"
     templates = "${path.module}/templates"
+    work      = "${var.project_root}/work"
   }
 }

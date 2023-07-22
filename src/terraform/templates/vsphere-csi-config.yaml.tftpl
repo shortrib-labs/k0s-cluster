@@ -1,0 +1,8 @@
+---
+apiVersion: v1
+metadata:
+  name: vsphere-config-secret
+  namespace: vmware-system-csi
+data:
+  csi-vsphere.conf: ${csi_vsphere_conf}
+kind: Secret
