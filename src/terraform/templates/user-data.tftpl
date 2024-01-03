@@ -37,24 +37,6 @@ package_update: true
 package_upgrade: true
 
 write_files:
-- path: /etc/netplan/80-workload-interface.yaml
-  content: |
-    # enable second interface on additional VLAN
-    network:
-      ethernets:
-        ens224:
-          dhcp4: true
-          dhcp4-overrides:
-            use-routes: no
-          routes:
-          - to: 0.0.0.0/0
-            via: 10.26.0.1
-            metric: 100
-            table: 103 
-          routing-policy:
-          - from: 10.26.0.0/16
-            table: 103 
-      version: 2
 - path: /etc/sysctl.d/75-kubelet.conf
   content: |
     # parameters that Kubelet expects and need to be set out of band for CIS compliance
@@ -101,4 +83,3 @@ write_files:
 runcmd:
 - [ chsh, -s, /usr/bin/zsh, crdant ]
 - echo "# limit who can use SSH\nAllowGroups ssher" > /etc/ssh/sshd_config.d/02-limit-to-ssher.conf
-- netplan apply
