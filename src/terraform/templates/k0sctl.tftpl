@@ -21,11 +21,15 @@ spec:
       dstDir: /var/lib/k0s/manifests/vsphere-csi
       perm: 0600
       dirPerm: 0755
-    - name: metallb-config
+    - name: default-ipaddresspool.yaml
       src: ${work_dir}/manifests/00-default-ipaddresspool.yaml
       dstDir: /var/lib/k0s/manifests/metallb-config
       perm: 0600
       dirPerm: 0755
+    - name: metallb-config
+      src: ${manifest_dir}/metallb-config/*.yaml
+      dstDir: /var/lib/k0s/manifests/metallb-config
+      perm: 0600
     - name: cert-manager
       src: ${manifest_dir}/cert-manager/*.yaml
       dstDir: /var/lib/k0s/manifests/cert-manager
@@ -33,11 +37,11 @@ spec:
       dirPerm: 0755
     - name: cloudflare-api-token.yaml
       src: ${work_dir}/manifests/01-cloudflare-api-token.yaml
-      dstDir: /var/lib/k0s/manifests/letsencrypt
+      dstDir: /var/lib/k0s/manifests/cloudflare
       perm: 0600
-    - name: letsencrypt
-      src: ${manifest_dir}/letsencrypt/*
-      dstDir: /var/lib/k0s/manifests/letsencrypt
+    - name: acme
+      src: ${manifest_dir}/acme/*
+      dstDir: /var/lib/k0s/manifests/acme
       perm: 0600
     - name: tailscaled
       src: ${manifest_dir}/tailscaled/*.yaml
@@ -60,7 +64,7 @@ spec:
     role: worker
   %{ endfor }
   k0s:
-    version: 1.26.0+k0s.0
+    version: 1.28.4+k0s.0
     dynamicConfig: false
     config:
       apiVersion: k0s.k0sproject.io/v1beta1
@@ -86,13 +90,10 @@ spec:
           kubeProxy:
             disabled: false
             mode: iptables
-          kuberouter:
-            autoMTU: true
-            mtu: 0
-            peerRouterASNs: ""
-            peerRouterIPs: ""
+          calico:
+            overlay: CrossSubnet
           podCIDR: 10.244.0.0/16
-          provider: kuberouter
+          provider: calico
           serviceCIDR: 10.96.0.0/12
         podSecurityPolicy:
           defaultPolicy: 00-k0s-privileged
