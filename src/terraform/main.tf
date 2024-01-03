@@ -54,6 +54,13 @@ resource "vsphere_virtual_machine" "control_plane" {
   name     = "${local.vm_prefix}-control-plane-${random_id.control_plane.hex}"
   count    = var.controllers
 
+  lifecycle { 
+    ignore_changes = [
+      host_system_id,
+      ept_rvi_mode,
+      hv_mode
+    ]
+  }
   datacenter_id    = data.vsphere_datacenter.datacenter.id
   datastore_id     = data.vsphere_datastore.datastore.id
   resource_pool_id = data.vsphere_resource_pool.resource_pool.id
@@ -125,6 +132,15 @@ resource "random_id" "worker" {
 resource "vsphere_virtual_machine" "worker" {
   name     = "${local.vm_prefix}-worker-${random_id.worker[count.index].hex}"
   count    = var.workers
+
+  lifecycle { 
+    ignore_changes = [
+      host_system_id,
+      disk,
+      ept_rvi_mode,
+      hv_mode
+    ]
+  }
 
   datacenter_id    = data.vsphere_datacenter.datacenter.id
   datastore_id     = data.vsphere_datastore.datastore.id
