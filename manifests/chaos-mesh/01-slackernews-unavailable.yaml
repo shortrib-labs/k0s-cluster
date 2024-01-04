@@ -1,0 +1,20 @@
+kind: Schedule
+apiVersion: chaos-mesh.org/v1alpha1
+metadata:
+  namespace: slackernews
+  name: inject-slackernews-failure
+spec:
+  schedule: '@every 10m'
+  startingDeadlineSeconds: null
+  concurrencyPolicy: Forbid
+  historyLimit: 1
+  type: PodChaos
+  podChaos:
+    selector:
+      namespaces:
+        - slackernews
+      labelSelectors:
+        app: slackernews-frontend
+    mode: one
+    action: pod-failure
+    duration: 2m
