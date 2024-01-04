@@ -61,8 +61,8 @@ cluster: nodes
 	@mkdir -p work/manifests
 	@sops --decrypt ${SECRETS_DIR}/cloudflare-api-token.yaml > ${WORK_DIR}/manifests/01-cloudflare-api-token.yaml
 	@sops --decrypt ${SECRETS_DIR}/tailscale-authkey.yaml > ${WORK_DIR}/manifests/01-tailscale-authkey.yaml
-	@k0sctl apply --config ${SECRETS_DIR}/k0sctl.yaml
-	@k0sctl kubeconfig --config ${SECRETS_DIR}/k0sctl.yaml > ${SECRETS_DIR}/kubeconfig
+	@k0sctl apply --disable-telemetry --config ${SECRETS_DIR}/k0sctl.yaml
+	@k0sctl kubeconfig --disable-telemetry --config ${SECRETS_DIR}/k0sctl.yaml > ${SECRETS_DIR}/kubeconfig
 	@rm -rf work/manifests
 
 .PHONY: test
