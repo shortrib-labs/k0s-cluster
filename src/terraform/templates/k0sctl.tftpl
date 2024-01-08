@@ -55,6 +55,12 @@ spec:
       src: ${work_dir}/manifests/02-tailscale-proxy.yaml
       dstDir: /var/lib/k0s/manifests/tailscaled
       perm: 0600
+    %{ if enable_gvisor }
+    - name: gvisor.yaml
+      src: ${manifest_dir}/runtimes/gvisor.yaml
+      dstDir: /var/lib/k0s/manifests/runtimes
+      perm: 0600
+    %{ endif }
     %{ endif }
   %{ endfor }
   %{ for worker in workers }

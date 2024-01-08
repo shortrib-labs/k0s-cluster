@@ -45,6 +45,11 @@ variable "load_balancer_cidr" {
 }
 
 
+variable "enable_gvisor" {
+  type = bool
+  default = false
+}
+
 variable "cpus" {
   type    = number
   default = 4

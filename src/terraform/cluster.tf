@@ -9,6 +9,8 @@ resource "local_sensitive_file" "k0sctl" {
                                 first_controller = vsphere_virtual_machine.control_plane.0.default_ip_address
                                 workers = [ for worker in vsphere_virtual_machine.worker : worker.default_ip_address ]
 
+                                enable_gvisor = var.enable_gvisor
+
                                 work_dir     = local.directories.work
                                 manifest_dir = local.directories.manifests
                             }
