@@ -47,6 +47,14 @@ write_files:
     kernel.panic_on_oops=1
     vm.overcommit_memory=1
     vm.panic_on_oom=0
+- path: /etc/netplan/80-workload-interface.yaml
+  content: |
+    # enable second interface on additional VLAN
+    network:
+      ethernets:
+        ens224:
+          dhcp4: true
+      version: 2
 - path: /etc/ssh/sshd_config.d/01-hardening.conf
   content: |
     # enable eed25519 key
@@ -84,3 +92,4 @@ write_files:
 runcmd:
 - [ chsh, -s, /usr/bin/zsh, crdant ]
 - echo "# limit who can use SSH\nAllowGroups ssher" > /etc/ssh/sshd_config.d/02-limit-to-ssher.conf
+- netplan apply
