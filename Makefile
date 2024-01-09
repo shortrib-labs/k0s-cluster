@@ -24,6 +24,7 @@ control_plane_mac     = $(shell yq --output-format json .cluster.control_plane_m
 load_balancer_cidr	  = "$(shell yq .cluster.load_balancer_cidr $(params_yaml))"
 
 enable_gvisor = "$(shell yq '.cluster.runtimes.gvisor.enabled // false' $(params_yaml))"
+enable_wasm = "$(shell yq '.cluster.runtimes.wasm.enabled // false' $(params_yaml))"
 
 vsphere_server    = "$(shell yq .vsphere.server $(params_yaml))"
 vsphere_username  = "$(shell yq .vsphere.username $(params_yaml))"

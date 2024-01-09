@@ -44,8 +44,12 @@ variable "load_balancer_cidr" {
   type = string
 }
 
-
 variable "enable_gvisor" {
+  type = bool
+  default = false
+}
+
+variable "enable_wasm" {
   type = bool
   default = false
 }

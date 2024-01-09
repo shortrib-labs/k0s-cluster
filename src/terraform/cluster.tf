@@ -10,6 +10,7 @@ resource "local_sensitive_file" "k0sctl" {
                                 workers = [ for worker in vsphere_virtual_machine.worker : worker.default_ip_address ]
 
                                 enable_gvisor = var.enable_gvisor
+                                enable_wasm = var.enable_wasm
 
                                 work_dir     = local.directories.work
                                 manifest_dir = local.directories.manifests

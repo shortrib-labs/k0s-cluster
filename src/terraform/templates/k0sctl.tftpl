@@ -61,6 +61,12 @@ spec:
       dstDir: /var/lib/k0s/manifests/runtimes
       perm: 0600
     %{ endif }
+    %{ if enable_wasm }
+    - name: wasmtime-spin.yaml
+      src: ${manifest_dir}/runtimes/wasmtime-spin.yaml
+      dstDir: /var/lib/k0s/manifests/runtimes
+      perm: 0600
+    %{ endif }
     %{ endif }
   %{ endfor }
   %{ for worker in workers }
