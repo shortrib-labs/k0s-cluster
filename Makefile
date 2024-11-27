@@ -40,8 +40,8 @@ workload_network	  = "$(shell yq .vsphere.workload_network $(params_yaml))"
 vsphere_datastore = "$(shell yq .vsphere.datastore $(params_yaml))"
 vsphere_folder	  = "$(shell yq .vsphere.folder $(params_yaml))"
 
-tailnet           = "$(shell yq .tailscale.tailnet $(params_yaml))"
-tailscale_api_key = "$(shell sops --decrypt --extract '["tailscale"]["api-key"]' $(params_yaml))"
+tailscale_client_id = "$(shell sops --decrypt --extract '["tailscale"]["client_iapi-keyd"]' $(params_yaml))"
+tailscale_client_secret = "$(shell sops --decrypt --extract '["tailscale"]["clieent_secret"]' $(params_yaml))"
 endef
 
 .PHONY: tfvars
