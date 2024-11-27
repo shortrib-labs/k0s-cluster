@@ -24,12 +24,13 @@ spec:
     - name: default-ipaddresspool.yaml
       src: ${work_dir}/manifests/00-default-ipaddresspool.yaml
       dstDir: /var/lib/k0s/manifests/metallb-config
-      perm: 0600
-      dirPerm: 0755
+      perm: 0640
+      dirPerm: 0775
     - name: metallb-config
       src: ${manifest_dir}/metallb-config/*.yaml
       dstDir: /var/lib/k0s/manifests/metallb-config
-      perm: 0600
+      perm: 0640
+      group: adm
     - name: cert-manager
       src: ${manifest_dir}/cert-manager/*.yaml
       dstDir: /var/lib/k0s/manifests/cert-manager
@@ -43,13 +44,13 @@ spec:
     - name: gvisor.yaml
       src: ${manifest_dir}/runtimes/gvisor.yaml
       dstDir: /var/lib/k0s/manifests/runtimes
-      perm: 0600
+      perm: 0640
     %{ endif }
     %{ if enable_wasm }
     - name: wasmtime-spin.yaml
       src: ${manifest_dir}/runtimes/wasmtime-spin.yaml
       dstDir: /var/lib/k0s/manifests/runtimes
-      perm: 0600
+      perm: 0640
     %{ endif }
     %{ endif }
   %{ endfor }
