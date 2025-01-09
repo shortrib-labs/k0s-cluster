@@ -24,12 +24,13 @@ spec:
     - name: default-ipaddresspool.yaml
       src: ${work_dir}/manifests/00-default-ipaddresspool.yaml
       dstDir: /var/lib/k0s/manifests/metallb-config
-      perm: 0600
-      dirPerm: 0755
+      perm: 0640
+      dirPerm: 0775
     - name: metallb-config
       src: ${manifest_dir}/metallb-config/*.yaml
       dstDir: /var/lib/k0s/manifests/metallb-config
-      perm: 0600
+      perm: 0640
+      group: adm
     - name: cert-manager
       src: ${manifest_dir}/cert-manager/*.yaml
       dstDir: /var/lib/k0s/manifests/cert-manager
@@ -38,18 +39,25 @@ spec:
     - name: acme
       src: ${manifest_dir}/acme/*
       dstDir: /var/lib/k0s/manifests/acme
-      perm: 0600
+      perm: 0640
+      dirPerm: 0775
+      group: adm
+    - name: acme
+      src: ${manifest_dir}/acme/*
+      dstDir: /var/lib/k0s/manifests/acme
+      perm: 0640
+      group: adm
     %{ if enable_gvisor }
     - name: gvisor.yaml
       src: ${manifest_dir}/runtimes/gvisor.yaml
       dstDir: /var/lib/k0s/manifests/runtimes
-      perm: 0600
+      perm: 0640
     %{ endif }
     %{ if enable_wasm }
     - name: wasmtime-spin.yaml
       src: ${manifest_dir}/runtimes/wasmtime-spin.yaml
       dstDir: /var/lib/k0s/manifests/runtimes
-      perm: 0600
+      perm: 0640
     %{ endif }
     %{ endif }
   %{ endfor }
@@ -103,12 +111,19 @@ spec:
             repositories:
             - name: metallb
               url: https://metallb.github.io/metallb
+<<<<<<< HEAD
             - name: tailscale
               url: https://pkgs.tailscale.com/helmcharts
             - name: nutanix
               url: https://nutanix.github.io/helm-releases
             - name: chaos-mesh
               url: https://charts.chaos-mesh.org
+=======
+            - name: bitnami
+              url: https://charts.bitnami.com/bitnami
+            - name: jetstack
+              url: https://charts.jetstack.io
+>>>>>>> 2b43aa8 (Updates some perms and brings chaos)
             charts:
             - name: nutanix-csi-storage
               chartname: nutanix/nutanix-csi-storage
@@ -141,6 +156,7 @@ spec:
             - name: projectcontour
               chartname: oci://index.docker.io/bitnamicharts/contour
               namespace: projectcontour
+<<<<<<< HEAD
               order: 20
             - name: chaos-mesh
               chartname: chaos-mesh/chaos-mesh
@@ -193,4 +209,6 @@ spec:
 
                         ## If TLS is set to true, you must declare what secret will store the key/certificate for TLS
                         tlsSecret: chaos.shortrib.dev-tls
+=======
+>>>>>>> 2b43aa8 (Updates some perms and brings chaos)
 
