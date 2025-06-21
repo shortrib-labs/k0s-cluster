@@ -40,8 +40,8 @@ workload_network	  = "$(shell yq .vsphere.workload_network $(params_yaml))"
 vsphere_datastore = "$(shell yq .vsphere.datastore $(params_yaml))"
 vsphere_folder	  = "$(shell yq .vsphere.folder $(params_yaml))"
 
-tailscale_client_id = "$(shell sops --decrypt --extract '["tailscale"]["client_iapi-keyd"]' $(params_yaml))"
-tailscale_client_secret = "$(shell sops --decrypt --extract '["tailscale"]["clieent_secret"]' $(params_yaml))"
+tailscale_client_id = "$(shell sops --decrypt --extract '["tailscale"]["client_id"]' $(params_yaml))"
+tailscale_client_secret = "$(shell sops --decrypt --extract '["tailscale"]["client_secret"]' $(params_yaml))"
 endef
 
 .PHONY: tfvars
@@ -64,8 +64,8 @@ cluster: nodes
 	@mkdir -p work/manifests
 	@sops --decrypt ${SECRETS_DIR}/cloudflare-api-token.yaml > ${WORK_DIR}/manifests/01-cloudflare-api-token.yaml
 	@sops --decrypt ${SECRETS_DIR}/tailscale-authkey.yaml > ${WORK_DIR}/manifests/01-tailscale-authkey.yaml
-	@k0sctl apply --disable-telemetry --config ${SECRETS_DIR}/k0sctl.yaml
-	@k0sctl kubeconfig --disable-telemetry --config ${SECRETS_DIR}/k0sctl.yaml > ${SECRETS_DIR}/kubeconfig
+	@k0sctl apply --config ${SECRETS_DIR}/k0sctl.yaml
+	@k0sctl kubeconfig --config ${SECRETS_DIR}/k0sctl.yaml > ${SECRETS_DIR}/kubeconfig
 	@rm -rf work/manifests
 
 .PHONY: test
