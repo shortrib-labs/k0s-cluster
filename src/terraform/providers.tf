@@ -18,7 +18,3 @@ provider "vsphere" {
   allow_unverified_ssl = true
 }
 
-provider "tailscale" {
-  api_key = var.tailscale_api_key
-  tailnet = var.tailnet
-}

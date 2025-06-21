@@ -35,25 +35,9 @@ spec:
       dstDir: /var/lib/k0s/manifests/cert-manager
       perm: 0600
       dirPerm: 0755
-    - name: cloudflare-api-token.yaml
-      src: ${work_dir}/manifests/01-cloudflare-api-token.yaml
-      dstDir: /var/lib/k0s/manifests/cloudflare
-      perm: 0600
     - name: acme
       src: ${manifest_dir}/acme/*
       dstDir: /var/lib/k0s/manifests/acme
-      perm: 0600
-    - name: tailscaled
-      src: ${manifest_dir}/tailscaled/*.yaml
-      dstDir: /var/lib/k0s/manifests/tailscaled
-      perm: 0600
-    - name: tailscale-authkey.yaml
-      src: ${work_dir}/manifests/01-tailscale-authkey.yaml
-      dstDir: /var/lib/k0s/manifests/tailscaled
-      perm: 0600
-    - name: tailscale-proxy.yaml
-      src: ${work_dir}/manifests/02-tailscale-proxy.yaml
-      dstDir: /var/lib/k0s/manifests/tailscaled
       perm: 0600
     %{ if enable_gvisor }
     - name: gvisor.yaml
@@ -119,21 +103,24 @@ spec:
             repositories:
             - name: metallb
               url: https://metallb.github.io/metallb
-            - name: bitnami
-              url: https://charts.bitnami.com/bitnami
             - name: tailscale
               url: https://pkgs.tailscale.com/helmcharts
             charts:
             - name: metallb
               chartname: metallb/metallb
               namespace: metallb
-            - name: projectcontour
-              chartname: bitnami/contour
-              namespace: projectcontour
+              order: 0
             - name: tailscale-operator
               chartname: tailscale/tailscale-operator
               namespace: tailscale
               values: |
+                operatorConfig:
+                  hostname: ${cluster_name}-operator
                 oauth:
                   clientId: ${tailscale_client_id}
                   clientSecret: ${tailscale_client_secret}
+              order: 10
+            - name: projectcontour
+              chartname: oci://index.docker.io/bitnamicharts/contour
+              namespace: projectcontour
+              order: 20

@@ -113,10 +113,6 @@ variable "vsphere_folder" {
   type = string
 }
 
-variable "tailnet" {
-  type = string
-}
-
 variable "tailscale_client_id" {
   type = string
 }
