@@ -119,6 +119,8 @@ spec:
                 oauth:
                   clientId: ${tailscale_client_id}
                   clientSecret: ${tailscale_client_secret}
+                apiServerProxyConfig:
+                  mode: "true"
               order: 10
             - name: projectcontour
               chartname: oci://index.docker.io/bitnamicharts/contour
