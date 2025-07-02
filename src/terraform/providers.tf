@@ -3,10 +3,6 @@ terraform {
     carvel = {
       source = "vmware-tanzu/carvel"
     }
-    tailscale = {
-      source = "tailscale/tailscale"
-      version = "0.13.7"
-    }
   }
 }
 
@@ -17,4 +13,3 @@ provider "vsphere" {
 
   allow_unverified_ssl = true
 }
-

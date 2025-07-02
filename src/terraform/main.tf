@@ -47,11 +47,11 @@ locals {
 
 resource "random_id" "control_plane" {
   byte_length = 4
-  
+  count    = var.controllers
 }
 
 resource "vsphere_virtual_machine" "control_plane" {
-  name     = "${local.vm_prefix}-control-plane-${random_id.control_plane.hex}"
+  name     = "${local.vm_prefix}-control-plane-${random_id.control_plane[count.index].hex}"
   count    = var.controllers
 
   lifecycle { 
@@ -100,7 +100,7 @@ resource "vsphere_virtual_machine" "control_plane" {
 
   vapp {
     properties = {
-      "instance-id" = "id-${local.vm_prefix}-control-plane-${random_id.control_plane.hex}"
+      "instance-id" = "id-${local.vm_prefix}-control-plane-${random_id.control_plane[count.index].hex}"
       "hostname"    = local.vm_prefix
       "password"    = random_pet.default_password.id
       "user-data"   = base64encode(local.user_data)
@@ -200,5 +200,10 @@ resource "vsphere_virtual_machine" "worker" {
     "isolation.tools.SetGUIOptions.enable" = "TRUE"
   }
 
+}
+
+resource "random_id" "manual_workers" {
+  byte_length = 4
+  count    = var.manual_workers
 }
 

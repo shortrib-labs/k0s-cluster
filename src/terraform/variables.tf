@@ -11,12 +11,17 @@ variable "domain" {
 }
 
 variable "controllers" {
-  type = string
+  type = number
   default = 1
 }
 
 variable "workers" {
-  type = string
+  type = number
+  default = 0
+}
+
+variable "manual_workers" {
+  type = number
   default = 0
 }
 
