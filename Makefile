@@ -13,8 +13,9 @@ cluster_image_name	 = "$(shell yq .cluster_image_name $(params_yaml))"
 ssh_authorized_keys = $(shell yq --output-format json .ssh.authorized_keys $(params_yaml))
 users = "$(shell yq --output-format json .users $(params_yaml) | sed 's/"/\\"/g')"
 
-controllers = "$(shell yq .cluster.controllers $(params_yaml))"
-workers     = "$(shell yq .cluster.workers $(params_yaml))"
+controllers    = "$(shell yq .cluster.controllers $(params_yaml))"
+workers        = "$(shell yq .cluster.workers $(params_yaml))"
+manual_workers = "$(shell yq .cluster.manual_workers $(params_yaml))"
 
 cpus			= "$(shell yq .node.cpus $(params_yaml))"
 memory		= "$(shell yq .node.memory $(params_yaml))"

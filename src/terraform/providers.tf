@@ -22,4 +22,3 @@ provider "nutanix" {
   insecure     = true # For self-signed certificates
   wait_timeout = 60
 }
-
