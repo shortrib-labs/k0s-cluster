@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: vcenter
+  namespace: homelab
+  annotations:
+    tailscale.com/hostname: vcenter
+    tailscale.com/tags: "tag:domain-lab-shortrib-net"
+    tailscale.com/expose: "true"
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 443
+  - name: vami
+    port: 5480
+    protocol: TCP
+    targetPort: 5480
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: vcenter-slice
+  namespace: homelab
+  labels:
+    kubernetes.io/service-name: vcenter  # Must match Service name
+addressType: IPv4
+ports:
+  - name: https
+    protocol: TCP
+    port: 443
+  - name: vami
+    protocol: TCP
+    port: 5480
+endpoints:
+  - addresses:
+      - 10.18.1.230
+    conditions:
+      ready: true
