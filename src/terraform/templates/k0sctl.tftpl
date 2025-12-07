@@ -11,14 +11,14 @@ spec:
     role: controller+worker
     %{ if controller == first_controller }
     files:
-    - name: vsphere-csi
-      src: ${manifest_dir}/vsphere-csi/*.yaml
-      dstDir: /var/lib/k0s/manifests/vsphere-csi
+    - name: nutanix-csi-secret
+      src: ${work_dir}/manifests/01-nutanix-csi-secret.yaml
+      dstDir: /var/lib/k0s/manifests/nutanix-csi
       perm: 0600
       dirPerm: 0755
-    - name: vsphere-csi-conf.yaml
-      src: ${work_dir}/manifests/01-vsphere-csi-config.yaml
-      dstDir: /var/lib/k0s/manifests/vsphere-csi
+    - name: nutanix-storageclass
+      src: ${work_dir}/manifests/02-nutanix-storageclass.yaml
+      dstDir: /var/lib/k0s/manifests/nutanix-csi
       perm: 0600
       dirPerm: 0755
     - name: default-ipaddresspool.yaml
@@ -105,7 +105,21 @@ spec:
               url: https://metallb.github.io/metallb
             - name: tailscale
               url: https://pkgs.tailscale.com/helmcharts
+            - name: nutanix
+              url: https://nutanix.github.io/helm-releases
             charts:
+            - name: nutanix-csi-storage
+              chartname: nutanix/nutanix-csi-storage
+              version: "3.3.9"
+              namespace: kube-system
+              order: 5
+              values: |
+                storageClass:
+                  enabled: true
+                prismEndPoint: ${nutanix_prism_central}
+                username: ${nutanix_username}
+                password: ${nutanix_password}
+                storageContainer: ${nutanix_storage_container}
             - name: metallb
               chartname: metallb/metallb
               namespace: metallb

@@ -1,6 +1,6 @@
-# vSphere k0s Cluster
+# Nutanix k0s Cluster
 
-Easily create a Kubernetes cluster on vSphere using [k0s](https://k0sproject.io)
+Easily create a Kubernetes cluster on Nutanix AHV using [k0s](https://k0sproject.io)
 and [Terraform](https://terraform.io)
 
 ## Goals and Audience
@@ -19,7 +19,8 @@ it use full.
 
 ### Required
 
-* A vSphere cluster
+* A Nutanix AHV cluster (minimum 3 nodes)
+* Prism Central 7.3+ with API access
 * Your favorite editor
 * A Unix-y workstation (WSL should work)
 * Make
@@ -28,6 +29,17 @@ it use full.
 * SOPS (for secrets management)
 * GPG (for SOPS)
 * [`k0sctl`](https://github.com/k0sproject/k0sctl#installation)
+
+### Nutanix Prerequisites
+
+* Nutanix cluster with available resources (3 vCPUs + 12 GB RAM + 120 GB storage)
+* Two subnets configured:
+  * Kubernetes management subnet
+  * Workload subnet (can be same as management if desired)
+* Storage container for VM disks
+* Prism Central user with cluster admin permissions
+* Network connectivity from workstation to Prism Central
+* DHCP server with ability to configure MAC-based reservations for control plane nodes
 
 ## Customizing for Your Environment
 

@@ -1,35 +1,24 @@
-data "vsphere_datacenter" "datacenter" {
-  name = var.vsphere_datacenter
+# Nutanix cluster reference using v1 API (more compatible)
+data "nutanix_cluster" "cluster" {
+  name = var.nutanix_cluster_name
 }
 
-data "vsphere_datastore" "datastore" {
-  name          = var.vsphere_datastore
-  datacenter_id = data.vsphere_datacenter.datacenter.id
+# Kubernetes management network using v1 API
+data "nutanix_subnet" "kubernetes_subnet" {
+  subnet_name = var.kubernetes_subnet
 }
 
-data "vsphere_compute_cluster" "cluster" {
-  name          = var.vsphere_cluster
-  datacenter_id = data.vsphere_datacenter.datacenter.id
+# Workload network using v1 API
+data "nutanix_subnet" "workload_subnet" {
+  subnet_name = var.workload_subnet
 }
 
-data "vsphere_resource_pool" "resource_pool" {
-  name          = var.vsphere_resource_pool
-  datacenter_id = data.vsphere_datacenter.datacenter.id
-}
-
-data "vsphere_host" "host" {
-  name          = var.vsphere_host
-  datacenter_id = data.vsphere_datacenter.datacenter.id
-}
-
-data "vsphere_network" "kubernetes_network" {
-  name          = var.kubernetes_network
-  datacenter_id = data.vsphere_datacenter.datacenter.id
-}
-
-data "vsphere_network" "workload_network" {
-  name          = var.workload_network
-  datacenter_id = data.vsphere_datacenter.datacenter.id
+# Ubuntu 24.04 Noble cloud image for k0s
+# Using v1 resource to download image directly from URL
+resource "nutanix_image" "ubuntu_cloud_image" {
+  name        = "Ubuntu 24.04 Noble Cloud Image"
+  description = "Ubuntu 24.04 Noble Cloud Image for k0s"
+  source_uri  = var.remote_ovf_url
 }
 
 resource "random_pet" "default_password" {
@@ -38,167 +27,9 @@ resource "random_pet" "default_password" {
 
 locals {
   user_data = templatefile("${local.directories.templates}/user-data.tftpl",
-                             {
-                               ssh_authorized_keys = yamlencode(var.ssh_authorized_keys)
-                               users = yamlencode(local.users)
-                             }
-                          )
-}
-
-resource "random_id" "control_plane" {
-  byte_length = 4
-  
-}
-
-resource "vsphere_virtual_machine" "control_plane" {
-  name     = "${local.vm_prefix}-control-plane-${random_id.control_plane.hex}"
-  count    = var.controllers
-
-  lifecycle { 
-    ignore_changes = [
-      host_system_id,
-      ept_rvi_mode,
-      hv_mode
-    ]
-  }
-  datacenter_id    = data.vsphere_datacenter.datacenter.id
-  datastore_id     = data.vsphere_datastore.datastore.id
-  resource_pool_id = data.vsphere_resource_pool.resource_pool.id
-  host_system_id   = data.vsphere_host.host.id
-  folder           = var.vsphere_folder
-
-  num_cpus = var.cpus
-  memory   = var.memory
-  guest_id = "ubuntu64Guest"
-  hardware_version = 19
-
-  network_interface {
-    network_id     = data.vsphere_network.kubernetes_network.id
-    use_static_mac = true
-    mac_address    = var.control_plane_mac[count.index]
-  }
-
-  network_interface {
-    network_id     = data.vsphere_network.workload_network.id
-  }
-
-  disk {
-    label            = "disk0"
-    size             = var.disk_size
-    unit_number      = 0
-
-    io_share_count   = 1000
-
-    thin_provisioned = true
-  }
-  enable_disk_uuid = true
-
-
-  cdrom {
-    client_device = true
-  }
-
-  vapp {
-    properties = {
-      "instance-id" = "id-${local.vm_prefix}-control-plane-${random_id.control_plane.hex}"
-      "hostname"    = local.vm_prefix
-      "password"    = random_pet.default_password.id
-      "user-data"   = base64encode(local.user_data)
+    {
+      ssh_authorized_keys = yamlencode(var.ssh_authorized_keys)
+      users               = yamlencode(local.users)
     }
-  }
-
-  ovf_deploy { 
-    remote_ovf_url = var.remote_ovf_url 
-    allow_unverified_ssl_cert = true
-
-    ip_protocol          = "IPV4"
-    ip_allocation_policy = "STATIC_MANUAL"
-    disk_provisioning    = "thin"
-  }
-
-  extra_config = {
-    "isolation.tools.copy.disable"         = "FALSE"
-    "isolation.tools.paste.disable"        = "FALSE"
-    "isolation.tools.SetGUIOptions.enable" = "TRUE"
-  }
-
+  )
 }
-
-resource "random_id" "worker" {
-  count       = var.workers
-  byte_length = 4
-}
-
-resource "vsphere_virtual_machine" "worker" {
-  name     = "${local.vm_prefix}-worker-${random_id.worker[count.index].hex}"
-  count    = var.workers
-
-  lifecycle { 
-    ignore_changes = [
-      host_system_id,
-      disk,
-      ept_rvi_mode,
-      hv_mode
-    ]
-  }
-
-  datacenter_id    = data.vsphere_datacenter.datacenter.id
-  datastore_id     = data.vsphere_datastore.datastore.id
-  resource_pool_id = data.vsphere_resource_pool.resource_pool.id
-  host_system_id   = data.vsphere_host.host.id
-  folder           = var.vsphere_folder
-
-  num_cpus = var.cpus
-  memory   = var.memory
-  guest_id = "ubuntu64Guest"
-  hardware_version = 19
-
-  network_interface {
-    network_id     = data.vsphere_network.kubernetes_network.id
-  }
-
-  network_interface {
-    network_id     = data.vsphere_network.workload_network.id
-  }
-
-  disk {
-    label            = "disk0"
-    size             = var.disk_size
-    unit_number      = 0
-
-    io_share_count   = 1000
-
-    thin_provisioned = true
-  }
-  enable_disk_uuid = true
-
-  cdrom {
-    client_device = true
-  }
-
-  vapp {
-    properties = {
-      "instance-id" = "id-${local.vm_prefix}-worker-${random_id.worker[count.index].hex}"
-      "hostname"    = "${local.vm_prefix}-worker-${random_id.worker[count.index].hex}"
-      "password"    = random_pet.default_password.id
-      "user-data"   = base64encode(local.user_data)
-    }
-  }
-
-  ovf_deploy { 
-    remote_ovf_url = var.remote_ovf_url 
-    allow_unverified_ssl_cert = true
-
-    ip_protocol          = "IPV4"
-    ip_allocation_policy = "DHCP"
-    disk_provisioning    = "thin"
-  }
-
-  extra_config = {
-    "isolation.tools.copy.disable"         = "FALSE"
-    "isolation.tools.paste.disable"        = "FALSE"
-    "isolation.tools.SetGUIOptions.enable" = "TRUE"
-  }
-
-}
-

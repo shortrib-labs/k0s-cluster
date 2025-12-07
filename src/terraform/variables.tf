@@ -11,12 +11,12 @@ variable "domain" {
 }
 
 variable "controllers" {
-  type = string
+  type    = string
   default = 1
 }
 
 variable "workers" {
-  type = string
+  type    = string
   default = 0
 }
 
@@ -25,15 +25,11 @@ variable "remote_ovf_url" {
 }
 
 variable "ssh_authorized_keys" {
-  type = list
+  type = list(any)
 }
 
 variable "users" {
   type = string
-}
-
-variable "control_plane_mac" {
-  type = list
 }
 
 variable "control_plane_cidr" {
@@ -45,12 +41,12 @@ variable "load_balancer_cidr" {
 }
 
 variable "enable_gvisor" {
-  type = bool
+  type    = bool
   default = false
 }
 
 variable "enable_wasm" {
-  type = bool
+  type    = bool
   default = false
 }
 
@@ -69,48 +65,47 @@ variable "disk_size" {
   default = 52
 }
 
-variable "vsphere_server" {
-  type = string
+# Nutanix Authentication
+variable "nutanix_username" {
+  type        = string
+  description = "Nutanix Prism Central username"
 }
 
-variable "vsphere_username" {
-  type = string
+variable "nutanix_password" {
+  type        = string
+  description = "Nutanix Prism Central password"
+  sensitive   = true
 }
 
-variable "vsphere_password" {
-  type = string
+variable "nutanix_prism_central" {
+  type        = string
+  description = "Nutanix Prism Central endpoint (IP or FQDN)"
 }
 
-variable "vsphere_datacenter" {
-  type = string
+# Nutanix Infrastructure
+variable "nutanix_cluster_name" {
+  type        = string
+  description = "Nutanix cluster name for VM placement"
 }
 
-variable "vsphere_cluster" {
-  type = string
+variable "nutanix_storage_container" {
+  type        = string
+  description = "Storage container for VM disks"
 }
 
-variable "vsphere_host" {
-  type = string
+variable "kubernetes_subnet" {
+  type        = string
+  description = "Nutanix subnet for Kubernetes management network"
 }
 
-variable "vsphere_datastore" {
-  type = string
+variable "workload_subnet" {
+  type        = string
+  description = "Nutanix subnet for workload network"
 }
 
-variable "kubernetes_network" {
-  type = string
-}
-
-variable "workload_network" {
-  type = string
-}
-
-variable "vsphere_resource_pool" {
-  type = string
-}
-
-variable "vsphere_folder" {
-  type = string
+variable "control_plane_mac" {
+  type        = list(string)
+  description = "MAC addresses for control plane nodes"
 }
 
 variable "tailscale_client_id" {
@@ -123,10 +118,9 @@ variable "tailscale_client_secret" {
 
 
 locals {
-  vm_prefix      = var.cluster_name
-  server_name    = "${var.cluster_name}.${var.domain}"
-  vsphere_folder = "${var.vsphere_datacenter}/vm/${var.vsphere_folder}"
-  users = jsondecode(var.users)
+  vm_prefix   = var.cluster_name
+  server_name = "${var.cluster_name}.${var.domain}"
+  users       = jsondecode(var.users)
   directories = {
     secrets   = "${var.project_root}/secrets"
     manifests = "${var.project_root}/manifests"
