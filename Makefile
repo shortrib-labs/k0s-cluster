@@ -8,7 +8,7 @@ cluster_name				 = "$(cluster_name)"
 domain					 = "$(shell yq e .domain $(params_yaml))"
 project_root		 = "$(PROJECT_DIR)"
 
-remote_ovf_url	 = "$(shell yq .remote_ovf_url $(params_yaml))"
+cluster_image_name	 = "$(shell yq .cluster_image_name $(params_yaml))"
 
 ssh_authorized_keys = $(shell yq --output-format json .ssh.authorized_keys $(params_yaml))
 users = "$(shell yq --output-format json .users $(params_yaml) | sed 's/"/\\"/g')"

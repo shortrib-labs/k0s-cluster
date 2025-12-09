@@ -20,7 +20,7 @@ variable "workers" {
   default = 0
 }
 
-variable "remote_ovf_url" {
+variable "cluster_image_name" {
   type = string
 }
 

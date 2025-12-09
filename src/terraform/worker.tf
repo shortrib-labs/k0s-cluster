@@ -27,7 +27,7 @@ resource "nutanix_virtual_machine" "worker" {
   disk_list {
     data_source_reference = {
       kind = "image"
-      uuid = nutanix_image.ubuntu_cloud_image.id
+      uuid = data.nutanix_image.ubuntu_cloud_image.id
     }
     disk_size_bytes = var.disk_size * 1024 * 1024 * 1024
   }
