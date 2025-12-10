@@ -40,6 +40,10 @@ spec:
       src: ${manifest_dir}/acme/*
       dstDir: /var/lib/k0s/manifests/acme
       perm: 0600
+    - name: acme
+      src: ${manifest_dir}/external-services/*
+      dstDir: /var/lib/k0s/manifests/external-services
+      perm: 0600
     %{ if enable_gvisor }
     - name: gvisor.yaml
       src: ${manifest_dir}/runtimes/gvisor.yaml
