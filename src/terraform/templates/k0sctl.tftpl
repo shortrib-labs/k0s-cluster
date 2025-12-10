@@ -57,6 +57,10 @@ spec:
       perm: 0640
     %{ endif }
     %{ endif }
+    - name: external-services
+      src: ${manifest_dir}/external-services/*
+      dstDir: /var/lib/k0s/manifests/external-services
+      perm: 0600
   %{ endfor }
   %{ for worker in workers }
   - ssh:
