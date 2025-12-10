@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: certificates
+  namespace: homelab
+  annotations:
+    tailscale.com/hostname: certificates
+    tailscale.com/tags: "tag:domain-shortrib-run"
+    tailscale.com/expose: "true"
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 443
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: certificates-slice
+  namespace: homelab
+  labels:
+    kubernetes.io/service-name: certificates  # Must match Service name
+addressType: IPv4
+ports:
+  - name: https
+    protocol: TCP
+    port: 443
+endpoints:
+  - addresses:
+      - 10.24.10.10
+    conditions:
+      ready: true
