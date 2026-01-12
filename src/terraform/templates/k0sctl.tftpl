@@ -136,7 +136,7 @@ spec:
                 apiServerProxyConfig:
                   mode: "true"
               order: 10
-            - name: projectcontour
-              chartname: oci://index.docker.io/bitnamicharts/contour
-              namespace: projectcontour
+            - name: traefik
+              chartname: oci://ghcr.io/traefik/helm/traefik
+              namespace: traefik
               order: 20
