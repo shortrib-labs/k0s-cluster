@@ -2,6 +2,8 @@ tfvars := ${SECRETS_DIR}/terrform.tfvars
 params_yaml := ${SECRETS_DIR}/params.yaml
 
 cluster_name := $(shell yq .cluster_name $(params_yaml))
+domain := $(shell yq .domain $(params_yaml))
+cluster_fqdn := $(cluster_name).$(domain)
 
 define TFVARS
 cluster_name				 = "$(cluster_name)"
@@ -69,6 +71,9 @@ test: $(tfvars)
 
 .PHONY: destroy
 destroy: $(tfvars)
+	@# Remove host keys before destroying (IPs will be gone after)
+	@(cd ${SOURCE_DIR}/terraform && terraform state list 2>/dev/null | grep nutanix_virtual_machine | xargs -I{} terraform state show {} 2>/dev/null | grep -oP 'ip\s*=\s*"\K[^"]+' | xargs -I{} ssh-keygen -R {} 2>/dev/null || true)
+	@ssh-keygen -R $(cluster_fqdn) 2>/dev/null || true
 	@(cd ${SOURCE_DIR}/terraform && terraform destroy -var-file $(tfvars) --auto-approve)
 
 clean:
