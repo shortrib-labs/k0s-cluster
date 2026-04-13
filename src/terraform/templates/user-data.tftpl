@@ -199,12 +199,12 @@ write_files:
 
 ### Run arbitrary commands at boot time
 runcmd:
-- [ chsh, -s, /usr/bin/zsh, crdant ]
+- [ chsh, -s, /usr/bin/zsh, ${user} ]
 - echo "# limit who can use SSH\nAllowGroups ssher" > /etc/ssh/sshd_config.d/02-limit-to-ssher.conf
 - netplan apply
 # Add cloud user to ssher group so they can SSH in
 - |
-  for user in ubuntu crdant ec2-user cloud-user admin; do
+  for user in ubuntu ${user} ec2-user cloud-user admin; do
     if id "$user" &>/dev/null; then
       usermod -aG ssher "$user"
       echo "[harden-ssh] Added $user to ssher group"
