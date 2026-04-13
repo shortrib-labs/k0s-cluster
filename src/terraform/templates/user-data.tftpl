@@ -102,41 +102,166 @@ write_files:
         ens224:
           dhcp4: true
       version: 2
-- path: /etc/ssh/sshd_config.d/01-hardening.conf
-  content: |
-    # enable eed25519 key
-    HostKey /etc/ssh/ssh_host_ed25519_key
-    # restrict supported key exchange, cipher, and MAC algorithms
-    KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group-exchange-sha256
-    Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
-    MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,umac-128-etm@openssh.com
-    HostKeyAlgorithms ssh-ed25519,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,rsa-sha2-256,rsa-sha2-512,rsa-sha2-256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com
-    # restrict authentication mechanism
-    PasswordAuthentication yes
-    ChallengeResponseAuthentication no
-    PubkeyAuthentication yes
-  permissions: '0644'
+# SSH server hardening - modular configs
+# Based on "Secure Secure Shell - Updated for 2025"
+- path: /etc/ssh/sshd_config.d/10-hostkeys.conf
   owner: root:root
-  #
-- path: /etc/ssh/ssh_config.d/01-hardening.conf
+  permissions: '0600'
   content: |
+    # Host Keys - Ed25519 and RSA-4096 only
+    HostKey /etc/ssh/ssh_host_ed25519_key
+    HostKey /etc/ssh/ssh_host_rsa_key
+- path: /etc/ssh/sshd_config.d/11-crypto.conf
+  owner: root:root
+  permissions: '0600'
+  content: |
+    # Cryptographic algorithms - post-quantum hybrids first (OpenSSH 9.0+)
+    KexAlgorithms mlkem768x25519-sha256,sntrup761x25519-sha512@openssh.com,curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group18-sha512,diffie-hellman-group16-sha512,diffie-hellman-group-exchange-sha256
+    Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+    MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com
+    HostKeyAlgorithms sk-ssh-ed25519-cert-v01@openssh.com,ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256
+- path: /etc/ssh/sshd_config.d/12-authentication.conf
+  owner: root:root
+  permissions: '0600'
+  content: |
+    # Authentication - public key only, no passwords, no root
+    AuthenticationMethods publickey
+    PubkeyAuthentication yes
+    PasswordAuthentication no
+    PermitEmptyPasswords no
+    KbdInteractiveAuthentication no
+    PermitRootLogin no
+- path: /etc/ssh/sshd_config.d/13-hardening.conf
+  owner: root:root
+  permissions: '0600'
+  content: |
+    # Attack surface reduction
+    # LoginGraceTime 30s mitigates CVE-2024-6387 (default 120s was a factor)
+    LoginGraceTime 30
+    MaxAuthTries 3
+    MaxSessions 4
+    MaxStartups 10:30:60
+- path: /etc/ssh/sshd_config.d/14-forwarding.conf
+  owner: root:root
+  permissions: '0600'
+  content: |
+    # Forwarding restrictions - disable all except agent forwarding
+    X11Forwarding no
+    AllowTcpForwarding no
+    GatewayPorts no
+    PermitTunnel no
+- path: /etc/ssh/sshd_config.d/15-agent-forwarding.conf
+  owner: root:root
+  permissions: '0600'
+  content: |
+    # Allow SSH agent forwarding for key-based access to other hosts
+    AllowAgentForwarding yes
+- path: /etc/ssh/sshd_config.d/16-misc.conf
+  owner: root:root
+  permissions: '0600'
+  content: |
+    # Miscellaneous hardening
+    StrictModes yes
+    IgnoreRhosts yes
+    HostbasedAuthentication no
+    PrintMotd no
+    AcceptEnv LANG LC_*
+    # VERBOSE logging records key fingerprints for audit
+    LogLevel VERBOSE
+- path: /etc/ssh/sshd_config.d/20-sftp-logging.conf
+  owner: root:root
+  permissions: '0600'
+  content: |
+    # SFTP with verbose logging for audit trail
+    Subsystem sftp /usr/lib/openssh/sftp-server -f AUTHPRIV -l INFO
+# SSH client hardening
+- path: /etc/ssh/ssh_config.d/10-hardening.conf
+  owner: root:root
+  permissions: '0644'
+  content: |
+    # GitHub-specific KEX for compatibility
     Host github.com
       KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256
+    # Default settings for all hosts
     Host *
-      # restrict supported key exchange, cipher, and MAC algorithms
-      KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group-exchange-sha256
+      # Post-quantum KEX algorithms (OpenSSH 9.0+)
+      KexAlgorithms mlkem768x25519-sha256,sntrup761x25519-sha512@openssh.com,curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group18-sha512,diffie-hellman-group16-sha512,diffie-hellman-group-exchange-sha256
       Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
-      MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,umac-128-etm@openssh.com
-      HostKeyAlgorithms ssh-ed25519,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,rsa-sha2-256,rsa-sha2-512,rsa-sha2-256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com
-      # restrict authentication mechanism
-      PasswordAuthentication no
-      ChallengeResponseAuthentication no
+      MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com
+      HostKeyAlgorithms sk-ssh-ed25519-cert-v01@openssh.com,ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256
       PubkeyAuthentication yes
-  permissions: '0644'
-  owner: root:root
+      PasswordAuthentication no
+      HashKnownHosts yes
+      ForwardAgent no
+      StrictHostKeyChecking ask
+      ServerAliveInterval 60
+      ServerAliveCountMax 3
 
-### Run arbitrary commands at rc.local like time
+### Run arbitrary commands at boot time
 runcmd:
 - [ chsh, -s, /usr/bin/zsh, crdant ]
 - echo "# limit who can use SSH\nAllowGroups ssher" > /etc/ssh/sshd_config.d/02-limit-to-ssher.conf
 - netplan apply
+# Add cloud user to ssher group so they can SSH in
+- |
+  for user in ubuntu crdant ec2-user cloud-user admin; do
+    if id "$user" &>/dev/null; then
+      usermod -aG ssher "$user"
+      echo "[harden-ssh] Added $user to ssher group"
+    fi
+  done
+# SSH hardening script - regenerate host keys, harden moduli, validate config
+- |
+  set -euo pipefail
+  log() { echo "[harden-ssh] $*"; }
+
+  # Regenerate host keys - Ed25519 + RSA-4096 only
+  log "Regenerating host keys (Ed25519 + RSA-4096 only)..."
+  cd /etc/ssh
+  rm -f ssh_host_*key*
+  ssh-keygen -t ed25519 -f ssh_host_ed25519_key -N "" -q
+  ssh-keygen -t rsa -b 4096 -f ssh_host_rsa_key -N "" -q
+  chmod 600 ssh_host_*_key
+  chmod 644 ssh_host_*_key.pub
+  log "Host keys regenerated."
+
+  # Harden moduli file - minimum 3072-bit DH groups
+  if [[ -f /etc/ssh/moduli ]]; then
+    ORIGINAL=$(wc -l < /etc/ssh/moduli)
+    awk '$5 >= 3071' /etc/ssh/moduli > /tmp/moduli.safe
+    FILTERED=$(wc -l < /tmp/moduli.safe)
+    if [[ "$FILTERED" -gt 0 ]]; then
+      mv /tmp/moduli.safe /etc/ssh/moduli
+      log "moduli: kept $FILTERED of $ORIGINAL groups (>= 3072 bits)."
+    else
+      log "WARNING: moduli filter left 0 entries - keeping original file."
+      rm /tmp/moduli.safe
+    fi
+  fi
+
+  # Ensure sshd_config includes drop-in directory
+  SSHD_CONF=/etc/ssh/sshd_config
+  if ! grep -q "^Include /etc/ssh/sshd_config.d/\*" "$SSHD_CONF" 2>/dev/null; then
+    log "Adding Include directive to $SSHD_CONF..."
+    sed -i '1s;^;Include /etc/ssh/sshd_config.d/*.conf\n\n;' "$SSHD_CONF"
+  fi
+
+  # Validate config before reload
+  log "Validating sshd config..."
+  if ! sshd -t; then
+    log "ERROR: sshd config validation failed. Aborting reload."
+    exit 1
+  fi
+  log "Config valid."
+
+  # Reload sshd
+  log "Reloading sshd..."
+  if systemctl is-active --quiet sshd 2>/dev/null; then
+    systemctl reload sshd
+  elif systemctl is-active --quiet ssh 2>/dev/null; then
+    systemctl reload ssh
+  else
+    log "WARNING: Could not find running sshd service to reload."
+  fi
+
+  log "SSH hardening complete."
