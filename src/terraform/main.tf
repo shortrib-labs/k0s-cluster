@@ -28,6 +28,7 @@ locals {
     {
       ssh_authorized_keys = yamlencode(var.ssh_authorized_keys)
       users               = yamlencode(local.users)
+      user                = local.users.1.name
     }
   )
 }
