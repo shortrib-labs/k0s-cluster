@@ -8,6 +8,9 @@ spec:
   - ssh:
       address: ${controller}
       user: ${user}
+    os:
+      override:
+        becomePrivileged: true
     role: controller+worker
     %{ if controller == first_controller }
     files:
@@ -57,6 +60,9 @@ spec:
   - ssh:
       address: ${worker}
       user: ${user}
+    os:
+      override:
+        becomePrivileged: true
     role: worker
   %{ endfor }
   k0s:
