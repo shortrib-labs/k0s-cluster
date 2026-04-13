@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# sops-merge - Git merge driver for SOPS encrypted files
+set -euo pipefail
+umask 077  # Temp files readable only by owner
+
+BASE="$1"    # %O - ancestor
+OURS="$2"    # %A - current branch
+THEIRS="$3"  # %B - other branch
+
+# Capture original permissions
+original_mode=$(stat -c '%a' "$OURS" 2>/dev/null || stat -f '%Lp' "$OURS")
+
+# Decrypt to temp files (mode 600 via umask)
+base_dec=$(mktemp)
+ours_dec=$(mktemp)
+theirs_dec=$(mktemp)
+trap "rm -f $base_dec $ours_dec $theirs_dec" EXIT
+
+sops -d "$BASE" > "$base_dec" 2>/dev/null || cat "$BASE" > "$base_dec"
+sops -d "$OURS" > "$ours_dec"
+sops -d "$THEIRS" > "$theirs_dec" 2>/dev/null || cat "$THEIRS" > "$theirs_dec"
+
+# 3-way merge on decrypted content
+if git merge-file -p "$ours_dec" "$base_dec" "$theirs_dec" > "$OURS.merged"; then
+    sops -e "$OURS.merged" > "$OURS"
+    chmod "$original_mode" "$OURS"
+    rm "$OURS.merged"
+    exit 0
+else
+    mv "$OURS.merged" "$OURS"
+    chmod "$original_mode" "$OURS"
+    exit 1
+fi

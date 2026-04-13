@@ -1,3 +1,3 @@
 *.enc diff=secrets
-secrets/*.yaml diff=sops
+secrets/*.yaml diff=sops merge=sops
 secrets/REDACTED-*.yaml diff
