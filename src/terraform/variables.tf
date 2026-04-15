@@ -93,6 +93,27 @@ variable "nutanix_storage_container" {
   description = "Storage container for VM disks"
 }
 
+variable "nutanix_file_server" {
+  type        = string
+  description = "Nutanix Files server name for RWX storage"
+}
+
+variable "nutanix_file_server_fqdn" {
+  type        = string
+  description = "Nutanix Files server FQDN for CSI authentication"
+}
+
+variable "nutanix_file_server_username" {
+  type        = string
+  description = "Username for Nutanix Files server"
+}
+
+variable "nutanix_file_server_password" {
+  type        = string
+  sensitive   = true
+  description = "Password for Nutanix Files server"
+}
+
 variable "kubernetes_subnet" {
   type        = string
   description = "Nutanix subnet for Kubernetes management network"
