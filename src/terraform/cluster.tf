@@ -34,10 +34,13 @@ resource "local_sensitive_file" "user-data" {
 
 resource "local_sensitive_file" "nutanix_csi_secret" {
   content = templatefile("${local.directories.templates}/nutanix-csi-secret.yaml.tftpl", {
-    prism_endpoint    = var.nutanix_prism_central
-    nutanix_username  = var.nutanix_username
-    nutanix_password  = var.nutanix_password
-    storage_container = var.nutanix_storage_container
+    prism_endpoint       = var.nutanix_prism_central
+    nutanix_username     = var.nutanix_username
+    nutanix_password     = var.nutanix_password
+    storage_container    = var.nutanix_storage_container
+    file_server_fqdn     = var.nutanix_file_server_fqdn
+    file_server_username = var.nutanix_file_server_username
+    file_server_password = var.nutanix_file_server_password
   })
   filename        = "${local.directories.work}/manifests/01-nutanix-csi-secret.yaml"
   file_permission = "0600"
@@ -48,6 +51,14 @@ resource "local_sensitive_file" "nutanix_storageclass" {
     storage_container = var.nutanix_storage_container
   })
   filename        = "${local.directories.work}/manifests/02-nutanix-storageclass.yaml"
+  file_permission = "0600"
+}
+
+resource "local_sensitive_file" "nutanix_files_storageclass" {
+  content = templatefile("${local.directories.templates}/nutanix-files-storageclass.yaml.tftpl", {
+    file_server = var.nutanix_file_server
+  })
+  filename        = "${local.directories.work}/manifests/03-nutanix-files-storageclass.yaml"
   file_permission = "0600"
 }
 
