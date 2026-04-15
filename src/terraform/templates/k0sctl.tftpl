@@ -39,6 +39,11 @@ spec:
       src: ${manifest_dir}/acme/*
       dstDir: /var/lib/k0s/manifests/acme
       perm: 0600
+    - name: nutanix-files-storageclass
+      src: ${work_dir}/manifests/03-nutanix-files-storageclass.yaml
+      dstDir: /var/lib/k0s/manifests/nutanix-csi
+      perm: 0600
+      dirPerm: 0755
     %{ if enable_gvisor }
     - name: gvisor.yaml
       src: ${manifest_dir}/runtimes/gvisor.yaml
@@ -116,10 +121,10 @@ spec:
               values: |
                 storageClass:
                   enabled: true
-                prismEndPoint: ${nutanix_prism_central}
-                username: ${nutanix_username}
-                password: ${nutanix_password}
-                storageContainer: ${nutanix_storage_container}
+                createSecret: false
+                createPrismCentralSecret: false
+                createVolumeSnapshotClass: false
+                kubeletDir: /var/lib/k0s/kubelet
             - name: metallb
               chartname: metallb/metallb
               namespace: metallb
