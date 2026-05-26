@@ -217,3 +217,37 @@ resource "kubernetes_manifest" "k0smotron_workerconfig" {
     k0s_version  = var.cluster_k0smotron_k0s_version
   }))
 }
+
+# Wait for the hosted control plane to come up before reading its kubeconfig.
+# 15-minute timeout accommodates cold-start image pulls on a fresh mgmt cluster.
+resource "null_resource" "wait_control_plane" {
+  count = var.cluster_mode == "k0smotron" ? 1 : 0
+
+  triggers = {
+    cluster_name = var.cluster_name
+  }
+
+  provisioner "local-exec" {
+    command = "kubectl --kubeconfig=${var.cluster_k0smotron_kubeconfig} -n ${var.cluster_k0smotron_namespace} wait --for=condition=ControlPlaneReady --timeout=15m k0smotroncontrolplane/${var.cluster_name}"
+  }
+
+  depends_on = [kubernetes_manifest.k0smotron_controlplane]
+}
+
+data "kubernetes_secret" "workload_kubeconfig" {
+  count = var.cluster_mode == "k0smotron" ? 1 : 0
+
+  metadata {
+    name      = "${var.cluster_name}-kubeconfig"
+    namespace = var.cluster_k0smotron_namespace
+  }
+
+  depends_on = [null_resource.wait_control_plane]
+}
+
+resource "local_sensitive_file" "workload_kubeconfig" {
+  count           = var.cluster_mode == "k0smotron" ? 1 : 0
+  content         = data.kubernetes_secret.workload_kubeconfig[0].data["value"]
+  filename        = "${local.directories.secrets}/kubeconfig"
+  file_permission = "0600"
+}
