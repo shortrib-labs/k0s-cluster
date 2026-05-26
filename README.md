@@ -50,6 +50,52 @@ of the file is documented in the file
 Copy the redacted version to `params.yaml` and edit as apporpriate 
 to connect to your cluster, specify the size of your node, etc.
 
+## Cluster Modes
+
+This repo can stand up a cluster in one of two modes, selected via
+`cluster.mode` in `params.yaml`.
+
+* **VM mode** (`vm`, default): the control plane runs on Nutanix VMs
+  provisioned and managed by this repo. No dependencies beyond what's
+  listed in [Requirements](#requirements).
+* **k0smotron mode** (`k0smotron`): the control plane runs as pods on a
+  separate Kubernetes cluster you operate (the "management cluster").
+  Worker nodes are still Nutanix VMs. Saves a VM per cluster and is
+  well-suited to short-lived test clusters.
+
+### k0smotron Mode Prerequisites
+
+You bring the management cluster and its supporting bits:
+
+* A reachable management Kubernetes cluster; supply its kubeconfig
+  path in `cluster.k0smotron.management_kubeconfig`.
+* [cert-manager](https://cert-manager.io/docs/installation/) installed
+  on the management cluster.
+* Cluster API core controllers installed (`clusterctl init`).
+* k0smotron CAPI providers installed:
+  `clusterctl init --bootstrap k0sproject-k0smotron --control-plane k0sproject-k0smotron --infrastructure k0sproject-k0smotron`.
+* [MetalLB](https://metallb.universe.tf/) on the management cluster
+  with an `IPAddressPool` reachable from the workload-cluster worker
+  subnet.
+* A pre-reserved IP from that pool in `cluster.k0smotron.external_ip`.
+* DNS: a CNAME (or A) record for `${cluster_name}.${domain}` pointing
+  at that IP.
+
+### Switching Modes
+
+Changing `cluster.mode` on a live cluster is destructive — the
+existing control plane gets torn down. The supported workflow is
+
+```shell
+$ make destroy
+# edit secrets/params.yaml, flip cluster.mode
+$ make cluster
+```
+
+If you know what you're doing and want to skip the destroy step, set
+`CONFIRM_MODE_SWITCH=1` to bypass the guard. You're on your own from
+there.
+
 ## Creating a Cluster
 
 The cluster is created using [Terraform](https://terraform.io), but
