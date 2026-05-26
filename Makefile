@@ -4,6 +4,8 @@ params_yaml := ${SECRETS_DIR}/params.yaml
 cluster_name := $(shell yq .cluster_name $(params_yaml))
 domain := $(shell yq .domain $(params_yaml))
 cluster_fqdn := $(cluster_name).$(domain)
+cluster_mode := $(shell yq ".cluster.mode // \"vm\"" $(params_yaml))
+cluster_k0smotron_kubeconfig := $(shell yq ".cluster.k0smotron.management_kubeconfig // \"\"" $(params_yaml))
 
 define TFVARS
 cluster_name				 = "$(cluster_name)"
@@ -61,10 +63,37 @@ $(tfvars): $(params_yaml)
 init: $(tfvars)
 	@(cd $(SOURCE_DIR)/terraform && terraform init)
 
+.PHONY: check-mode-switch
+check-mode-switch:
+	@cd $(SOURCE_DIR)/terraform && \
+	  has_vm_cp=$$(terraform state list 2>/dev/null | grep -c 'nutanix_virtual_machine.control_plane' || true); \
+	  has_k0s=$$(terraform state list 2>/dev/null | grep -c 'kubernetes_manifest.k0smotron_controlplane' || true); \
+	  if [ "$$has_vm_cp" -gt 0 ] && [ "$(cluster_mode)" = "k0smotron" ]; then \
+	    if [ "$$CONFIRM_MODE_SWITCH" != "1" ]; then \
+	      echo "ERROR: state has VM control-plane resources but cluster.mode is k0smotron."; \
+	      echo "       This will DESTROY your VM control plane. Set CONFIRM_MODE_SWITCH=1 to proceed."; \
+	      exit 1; \
+	    fi; \
+	  fi; \
+	  if [ "$$has_k0s" -gt 0 ] && [ "$(cluster_mode)" = "vm" ]; then \
+	    if [ "$$CONFIRM_MODE_SWITCH" != "1" ]; then \
+	      echo "ERROR: state has k0smotron CRs but cluster.mode is vm."; \
+	      echo "       This will DESTROY your k0smotron control plane. Set CONFIRM_MODE_SWITCH=1 to proceed."; \
+	      exit 1; \
+	    fi; \
+	  fi
+
 .PHONY: nodes
-nodes: $(tfvars)
+nodes: $(tfvars) check-mode-switch
 	@(cd ${SOURCE_DIR}/terraform && terraform apply -var-file $(tfvars) --auto-approve)
 
+ifeq ($(cluster_mode),k0smotron)
+.PHONY: cluster
+cluster: nodes
+	@sops --decrypt ${SECRETS_DIR}/cloudflare-api-token.yaml | kubectl --kubeconfig=$(SECRETS_DIR)/kubeconfig apply -n cert-manager -f -
+	@export KUBECONFIG=${SECRETS_DIR}/kubeconfig && tailscale configure kubeconfig $(cluster_name)-operator
+	@yq -i '.contexts[] |= (select(.name == "$(cluster_name)-operator.walrus-shark.ts.net").name = "tailscale-auth@$(cluster_name)" // .) | .contexts[] |= (select(.name == "$(cluster_name)").name = "$(cluster_name)-admin@$(cluster_name)" // .) | .contexts[] |= (select(.context.user == "admin").context.user = "$(cluster_name)-admin" // .) | .users[] |= (select(.name == "admin").name = "$(cluster_name)-admin" // .) | .current-context = "$(cluster_name)-admin@$(cluster_name)"' ${SECRETS_DIR}/kubeconfig
+else
 .PHONY: cluster
 cluster: nodes
 	@mkdir -p work/manifests
@@ -74,17 +103,33 @@ cluster: nodes
 	@export KUBECONFIG=${SECRETS_DIR}/kubeconfig && tailscale configure kubeconfig $(cluster_name)-operator
 	@yq -i '.contexts[] |= (select(.name == "$(cluster_name)-operator.walrus-shark.ts.net").name = "tailscale-auth@$(cluster_name)" // .) | .contexts[] |= (select(.name == "$(cluster_name)").name = "$(cluster_name)-admin@$(cluster_name)" // .) | .contexts[] |= (select(.context.user == "admin").context.user = "$(cluster_name)-admin" // .) | .users[] |= (select(.name == "admin").name = "$(cluster_name)-admin" // .) | .current-context = "$(cluster_name)-admin@$(cluster_name)"' ${SECRETS_DIR}/kubeconfig
 	@rm -rf work/manifests
+endif
 
+ifeq ($(cluster_mode),k0smotron)
+.PHONY: test
+test: $(tfvars)
+	@kubectl --kubeconfig=$(cluster_k0smotron_kubeconfig) cluster-info
+	@(cd ${SOURCE_DIR}/terraform && terraform plan -var-file $(tfvars))
+else
 .PHONY: test
 test: $(tfvars)
 	@(cd ${SOURCE_DIR}/terraform && terraform plan -var-file $(tfvars))
+endif
 
+ifeq ($(cluster_mode),k0smotron)
+.PHONY: destroy
+destroy: $(tfvars)
+	@# Remove worker host keys before destroying (IPs will be gone after)
+	@(cd ${SOURCE_DIR}/terraform && terraform state list 2>/dev/null | grep nutanix_virtual_machine | xargs -I{} terraform state show {} 2>/dev/null | grep -oP 'ip\s*=\s*"\K[^"]+' | xargs -I{} ssh-keygen -R {} 2>/dev/null || true)
+	@(cd ${SOURCE_DIR}/terraform && terraform destroy -var-file $(tfvars) --auto-approve)
+else
 .PHONY: destroy
 destroy: $(tfvars)
 	@# Remove host keys before destroying (IPs will be gone after)
 	@(cd ${SOURCE_DIR}/terraform && terraform state list 2>/dev/null | grep nutanix_virtual_machine | xargs -I{} terraform state show {} 2>/dev/null | grep -oP 'ip\s*=\s*"\K[^"]+' | xargs -I{} ssh-keygen -R {} 2>/dev/null || true)
 	@ssh-keygen -R $(cluster_fqdn) 2>/dev/null || true
 	@(cd ${SOURCE_DIR}/terraform && terraform destroy -var-file $(tfvars) --auto-approve)
+endif
 
 clean:
 	@rm $(tfvars)
