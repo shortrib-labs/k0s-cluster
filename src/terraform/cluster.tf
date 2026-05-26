@@ -1,4 +1,5 @@
 resource "local_sensitive_file" "k0sctl" {
+  count = var.cluster_mode == "vm" ? 1 : 0
   content = templatefile("${local.directories.templates}/k0sctl.tftpl",
     {
       user = local.users.1.name

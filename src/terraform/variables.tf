@@ -20,6 +20,45 @@ variable "workers" {
   default = 0
 }
 
+variable "cluster_mode" {
+  type    = string
+  default = "vm"
+  validation {
+    condition     = contains(["vm", "k0smotron"], var.cluster_mode)
+    error_message = "cluster_mode must be \"vm\" or \"k0smotron\"."
+  }
+}
+
+variable "cluster_k0smotron_kubeconfig" {
+  type        = string
+  default     = ""
+  description = "Path to kubeconfig for the management cluster hosting the k0smotron control plane. Required when cluster_mode = k0smotron."
+  validation {
+    condition     = var.cluster_mode != "k0smotron" || var.cluster_k0smotron_kubeconfig != ""
+    error_message = "cluster_k0smotron_kubeconfig must be set when cluster_mode is \"k0smotron\"."
+  }
+}
+
+variable "cluster_k0smotron_namespace" {
+  type    = string
+  default = "clusters"
+}
+
+variable "cluster_k0smotron_external_ip" {
+  type        = string
+  default     = ""
+  description = "Pre-reserved MetalLB IP on the mgmt cluster for the hosted apiserver. Required when cluster_mode = k0smotron."
+  validation {
+    condition     = var.cluster_mode != "k0smotron" || var.cluster_k0smotron_external_ip != ""
+    error_message = "cluster_k0smotron_external_ip must be set when cluster_mode is \"k0smotron\"."
+  }
+}
+
+variable "cluster_k0smotron_k0s_version" {
+  type    = string
+  default = "v1.35.2+k0s.0"
+}
+
 variable "cluster_image_name" {
   type = string
 }

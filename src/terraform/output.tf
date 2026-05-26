@@ -18,3 +18,8 @@ output "worker_ips" {
   ]
   description = "IP addresses of worker nodes"
 }
+
+output "k0smotron_endpoint" {
+  value       = var.cluster_k0smotron_external_ip
+  description = "External IP for the workload apiserver in k0smotron mode; empty in VM mode."
+}
