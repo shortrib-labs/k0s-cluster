@@ -34,6 +34,7 @@ resource "local_sensitive_file" "user-data" {
 }
 
 resource "local_sensitive_file" "nutanix_csi_secret" {
+  count = var.cluster_mode == "vm" ? 1 : 0
   content = templatefile("${local.directories.templates}/nutanix-csi-secret.yaml.tftpl", {
     prism_endpoint       = var.nutanix_prism_central
     nutanix_username     = var.nutanix_username
@@ -48,6 +49,7 @@ resource "local_sensitive_file" "nutanix_csi_secret" {
 }
 
 resource "local_sensitive_file" "nutanix_storageclass" {
+  count = var.cluster_mode == "vm" ? 1 : 0
   content = templatefile("${local.directories.templates}/nutanix-storageclass.yaml.tftpl", {
     storage_container = var.nutanix_storage_container
   })
@@ -56,6 +58,7 @@ resource "local_sensitive_file" "nutanix_storageclass" {
 }
 
 resource "local_sensitive_file" "nutanix_files_storageclass" {
+  count = var.cluster_mode == "vm" ? 1 : 0
   content = templatefile("${local.directories.templates}/nutanix-files-storageclass.yaml.tftpl", {
     file_server = var.nutanix_file_server
   })
@@ -64,6 +67,7 @@ resource "local_sensitive_file" "nutanix_files_storageclass" {
 }
 
 resource "local_sensitive_file" "ip_address_pool" {
+  count = var.cluster_mode == "vm" ? 1 : 0
   content = templatefile("${local.directories.templates}/default-ipaddresspool.yaml.tftpl",
     {
       load_balancer_cidr = var.load_balancer_cidr
