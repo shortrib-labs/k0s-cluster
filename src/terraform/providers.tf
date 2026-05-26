@@ -11,6 +11,14 @@ terraform {
       source  = "nutanix/nutanix"
       version = "~> 2.3"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.30"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
   }
 }
 
@@ -23,3 +31,6 @@ provider "nutanix" {
   wait_timeout = 60
 }
 
+provider "kubernetes" {
+  config_path = var.cluster_k0smotron_kubeconfig != "" ? var.cluster_k0smotron_kubeconfig : null
+}

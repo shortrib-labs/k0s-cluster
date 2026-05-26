@@ -26,9 +26,12 @@ resource "random_pet" "default_password" {
 locals {
   user_data = templatefile("${local.directories.templates}/user-data.tftpl",
     {
-      ssh_authorized_keys = yamlencode(var.ssh_authorized_keys)
-      users               = yamlencode(local.users)
-      user                = local.users.1.name
+      ssh_authorized_keys = yamlencode(concat(
+        var.ssh_authorized_keys,
+        tls_private_key.bootstrap_ssh[*].public_key_openssh
+      ))
+      users = yamlencode(local.users)
+      user  = local.users.1.name
     }
   )
 }
