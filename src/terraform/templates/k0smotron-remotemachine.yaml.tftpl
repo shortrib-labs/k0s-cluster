@@ -1,0 +1,12 @@
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: RemoteMachine
+metadata:
+  name: ${cluster_name}-worker-${index}
+  namespace: ${namespace}
+spec:
+  address: ${worker_ip}
+  port: 22
+  user: ${ssh_user}
+  useSudo: true
+  sshKeyRef:
+    name: ${cluster_name}-bootstrap-ssh

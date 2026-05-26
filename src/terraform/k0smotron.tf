@@ -142,3 +142,78 @@ resource "kubernetes_config_map" "runtimes" {
     var.enable_wasm ? { "wasmtime-spin.yaml" = file("${local.directories.manifests}/runtimes/wasmtime-spin.yaml") } : {}
   )
 }
+
+# CAPI Cluster + sibling RemoteCluster establish the workload-cluster identity
+# on the mgmt cluster. K0smotronControlPlane reconciles the hosted apiserver
+# pods. Per-worker Machine/RemoteMachine/K0sWorkerConfig triplets cause the
+# k0smotron CAPI infra provider to SSH into each worker VM and install k0s.
+resource "kubernetes_manifest" "k0smotron_cluster" {
+  count = var.cluster_mode == "k0smotron" ? 1 : 0
+  manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-cluster.yaml.tftpl", {
+    cluster_name = var.cluster_name
+    namespace    = var.cluster_k0smotron_namespace
+  }))
+}
+
+resource "kubernetes_manifest" "k0smotron_remotecluster" {
+  count = var.cluster_mode == "k0smotron" ? 1 : 0
+  manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-remotecluster.yaml.tftpl", {
+    cluster_name = var.cluster_name
+    namespace    = var.cluster_k0smotron_namespace
+  }))
+}
+
+resource "kubernetes_manifest" "k0smotron_controlplane" {
+  count = var.cluster_mode == "k0smotron" ? 1 : 0
+  manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-controlplane.yaml.tftpl", {
+    cluster_name            = var.cluster_name
+    namespace               = var.cluster_k0smotron_namespace
+    external_ip             = var.cluster_k0smotron_external_ip
+    k0s_version             = var.cluster_k0smotron_k0s_version
+    cluster_fqdn            = local.server_name
+    tailscale_client_id     = var.tailscale_client_id
+    tailscale_client_secret = var.tailscale_client_secret
+    enable_runtimes         = var.enable_gvisor || var.enable_wasm
+  }))
+  depends_on = [
+    kubernetes_secret.nutanix_csi,
+    kubernetes_config_map.nutanix_csi_config,
+    kubernetes_config_map.metallb_config,
+    kubernetes_config_map.cert_manager,
+    kubernetes_config_map.cert_manager_crds,
+    kubernetes_config_map.acme,
+    kubernetes_config_map.runtimes,
+  ]
+}
+
+resource "kubernetes_manifest" "k0smotron_machine" {
+  for_each = var.cluster_mode == "k0smotron" ? { for i, w in data.nutanix_virtual_machine.worker : tostring(i) => w } : {}
+  manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-machine.yaml.tftpl", {
+    cluster_name = var.cluster_name
+    namespace    = var.cluster_k0smotron_namespace
+    index        = each.key
+  }))
+  depends_on = [kubernetes_manifest.k0smotron_cluster]
+}
+
+resource "kubernetes_manifest" "k0smotron_remotemachine" {
+  for_each = var.cluster_mode == "k0smotron" ? { for i, w in data.nutanix_virtual_machine.worker : tostring(i) => w } : {}
+  manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-remotemachine.yaml.tftpl", {
+    cluster_name = var.cluster_name
+    namespace    = var.cluster_k0smotron_namespace
+    index        = each.key
+    worker_ip    = each.value.nic_list[0].ip_endpoint_list[0].ip
+    ssh_user     = local.users.1.name
+  }))
+  depends_on = [kubernetes_secret.bootstrap_ssh]
+}
+
+resource "kubernetes_manifest" "k0smotron_workerconfig" {
+  for_each = var.cluster_mode == "k0smotron" ? { for i, w in data.nutanix_virtual_machine.worker : tostring(i) => w } : {}
+  manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-workerconfig.yaml.tftpl", {
+    cluster_name = var.cluster_name
+    namespace    = var.cluster_k0smotron_namespace
+    index        = each.key
+    k0s_version  = var.cluster_k0smotron_k0s_version
+  }))
+}

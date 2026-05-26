@@ -23,3 +23,11 @@ output "k0smotron_endpoint" {
   value       = var.cluster_k0smotron_external_ip
   description = "External IP for the workload apiserver in k0smotron mode; empty in VM mode."
 }
+
+output "workload_kubeconfig_secret" {
+  value = var.cluster_mode == "k0smotron" ? {
+    name      = "${var.cluster_name}-kubeconfig"
+    namespace = var.cluster_k0smotron_namespace
+  } : null
+  description = "Mgmt-cluster Secret holding the workload cluster's admin kubeconfig (k0smotron mode only)."
+}
