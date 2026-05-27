@@ -1,14 +1,14 @@
 resource "random_id" "control_plane" {
-  count       = var.cluster_mode == "vm" ? var.controllers : 0
+  count       = local.vm_mode ? var.controllers : 0
   byte_length = 4
 }
 
 resource "random_uuid" "control_plane" {
-  count = var.cluster_mode == "vm" ? var.controllers : 0
+  count = local.vm_mode ? var.controllers : 0
 }
 
 resource "nutanix_virtual_machine" "control_plane" {
-  count       = var.cluster_mode == "vm" ? var.controllers : 0
+  count       = local.vm_mode ? var.controllers : 0
   name        = "${local.vm_prefix}-control-plane-${random_id.control_plane[count.index].hex}"
   description = "k0s control plane node"
 
@@ -61,6 +61,6 @@ resource "nutanix_virtual_machine" "control_plane" {
 
 # Fetch VMs after creation to get assigned IPs
 data "nutanix_virtual_machine" "control_plane" {
-  count = var.cluster_mode == "vm" ? var.controllers : 0
+  count = local.vm_mode ? var.controllers : 0
   vm_id = nutanix_virtual_machine.control_plane[count.index].id
 }

@@ -18,7 +18,9 @@ spec:
     kind: ClusterConfig
     spec:
       api:
-        externalAddress: ${cluster_fqdn}
+        externalAddress: ${external_ip}
+        sans:
+          - ${cluster_fqdn}
       network:
         provider: calico
         calico:

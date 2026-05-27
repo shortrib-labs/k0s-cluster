@@ -3,13 +3,13 @@
 # Private half is staged as a Secret on the management cluster so the
 # k0smotron CAPI infra provider can SSH into workers to install k0s.
 resource "tls_private_key" "bootstrap_ssh" {
-  count     = var.cluster_mode == "k0smotron" ? 1 : 0
+  count     = local.k0smotron ? 1 : 0
   algorithm = "RSA"
   rsa_bits  = 4096
 }
 
 resource "kubernetes_secret" "bootstrap_ssh" {
-  count = var.cluster_mode == "k0smotron" ? 1 : 0
+  count = local.k0smotron ? 1 : 0
 
   metadata {
     name      = "${var.cluster_name}-bootstrap-ssh"
@@ -30,7 +30,7 @@ resource "kubernetes_secret" "bootstrap_ssh" {
 # bootstrap content (storage classes, MetalLB pool, cert-manager, ACME issuers).
 
 resource "kubernetes_secret" "nutanix_csi" {
-  count = var.cluster_mode == "k0smotron" ? 1 : 0
+  count = local.k0smotron ? 1 : 0
 
   metadata {
     name      = "${var.cluster_name}-nutanix-csi-secret"
@@ -38,22 +38,14 @@ resource "kubernetes_secret" "nutanix_csi" {
   }
 
   data = {
-    "01-nutanix-csi-secret.yaml" = templatefile("${local.directories.templates}/nutanix-csi-secret.yaml.tftpl", {
-      prism_endpoint       = var.nutanix_prism_central
-      nutanix_username     = var.nutanix_username
-      nutanix_password     = var.nutanix_password
-      storage_container    = var.nutanix_storage_container
-      file_server_fqdn     = var.nutanix_file_server_fqdn
-      file_server_username = var.nutanix_file_server_username
-      file_server_password = var.nutanix_file_server_password
-    })
+    "01-nutanix-csi-secret.yaml" = local.nutanix_csi_secret_yaml
   }
 
   type = "Opaque"
 }
 
 resource "kubernetes_config_map" "nutanix_csi_config" {
-  count = var.cluster_mode == "k0smotron" ? 1 : 0
+  count = local.k0smotron ? 1 : 0
 
   metadata {
     name      = "${var.cluster_name}-nutanix-csi-config"
@@ -61,17 +53,13 @@ resource "kubernetes_config_map" "nutanix_csi_config" {
   }
 
   data = {
-    "02-nutanix-storageclass.yaml" = templatefile("${local.directories.templates}/nutanix-storageclass.yaml.tftpl", {
-      storage_container = var.nutanix_storage_container
-    })
-    "03-nutanix-files-storageclass.yaml" = templatefile("${local.directories.templates}/nutanix-files-storageclass.yaml.tftpl", {
-      file_server = var.nutanix_file_server
-    })
+    "02-nutanix-storageclass.yaml"       = local.nutanix_storageclass_yaml
+    "03-nutanix-files-storageclass.yaml" = local.nutanix_files_storageclass_yaml
   }
 }
 
 resource "kubernetes_config_map" "metallb_config" {
-  count = var.cluster_mode == "k0smotron" ? 1 : 0
+  count = local.k0smotron ? 1 : 0
 
   metadata {
     name      = "${var.cluster_name}-metallb-config"
@@ -92,7 +80,7 @@ resource "kubernetes_config_map" "metallb_config" {
 # Cert-manager CRDs and workload manifests live in separate ConfigMaps because
 # the combined upstream YAML (~993 KiB) exceeds the 1 MiB ConfigMap size limit.
 resource "kubernetes_config_map" "cert_manager_crds" {
-  count = var.cluster_mode == "k0smotron" ? 1 : 0
+  count = local.k0smotron ? 1 : 0
 
   metadata {
     name      = "${var.cluster_name}-cert-manager-crds"
@@ -102,10 +90,17 @@ resource "kubernetes_config_map" "cert_manager_crds" {
   data = {
     "00-cert-manager-crds.yaml" = file("${local.directories.manifests}/cert-manager/00-cert-manager-crds.yaml")
   }
+
+  lifecycle {
+    precondition {
+      condition     = length(file("${local.directories.manifests}/cert-manager/00-cert-manager-crds.yaml")) < 950000
+      error_message = "manifests/cert-manager/00-cert-manager-crds.yaml exceeds 950000 bytes — too close to the 1 MiB ConfigMap limit. Split the file or update cert-manager to a smaller bundle."
+    }
+  }
 }
 
 resource "kubernetes_config_map" "cert_manager" {
-  count = var.cluster_mode == "k0smotron" ? 1 : 0
+  count = local.k0smotron ? 1 : 0
 
   metadata {
     name      = "${var.cluster_name}-cert-manager"
@@ -118,7 +113,7 @@ resource "kubernetes_config_map" "cert_manager" {
 }
 
 resource "kubernetes_config_map" "acme" {
-  count = var.cluster_mode == "k0smotron" ? 1 : 0
+  count = local.k0smotron ? 1 : 0
 
   metadata {
     name      = "${var.cluster_name}-acme"
@@ -130,7 +125,7 @@ resource "kubernetes_config_map" "acme" {
 
 # Optional runtime classes (gvisor, wasmtime-spin) only ship when enabled.
 resource "kubernetes_config_map" "runtimes" {
-  count = var.cluster_mode == "k0smotron" && (var.enable_gvisor || var.enable_wasm) ? 1 : 0
+  count = local.k0smotron && (var.enable_gvisor || var.enable_wasm) ? 1 : 0
 
   metadata {
     name      = "${var.cluster_name}-runtimes"
@@ -148,7 +143,7 @@ resource "kubernetes_config_map" "runtimes" {
 # pods. Per-worker Machine/RemoteMachine/K0sWorkerConfig triplets cause the
 # k0smotron CAPI infra provider to SSH into each worker VM and install k0s.
 resource "kubernetes_manifest" "k0smotron_cluster" {
-  count = var.cluster_mode == "k0smotron" ? 1 : 0
+  count = local.k0smotron ? 1 : 0
   manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-cluster.yaml.tftpl", {
     cluster_name = var.cluster_name
     namespace    = var.cluster_k0smotron_namespace
@@ -156,7 +151,7 @@ resource "kubernetes_manifest" "k0smotron_cluster" {
 }
 
 resource "kubernetes_manifest" "k0smotron_remotecluster" {
-  count = var.cluster_mode == "k0smotron" ? 1 : 0
+  count = local.k0smotron ? 1 : 0
   manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-remotecluster.yaml.tftpl", {
     cluster_name = var.cluster_name
     namespace    = var.cluster_k0smotron_namespace
@@ -164,7 +159,7 @@ resource "kubernetes_manifest" "k0smotron_remotecluster" {
 }
 
 resource "kubernetes_manifest" "k0smotron_controlplane" {
-  count = var.cluster_mode == "k0smotron" ? 1 : 0
+  count = local.k0smotron ? 1 : 0
   manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-controlplane.yaml.tftpl", {
     cluster_name            = var.cluster_name
     namespace               = var.cluster_k0smotron_namespace
@@ -187,7 +182,7 @@ resource "kubernetes_manifest" "k0smotron_controlplane" {
 }
 
 resource "kubernetes_manifest" "k0smotron_machine" {
-  for_each = var.cluster_mode == "k0smotron" ? { for i, w in data.nutanix_virtual_machine.worker : tostring(i) => w } : {}
+  for_each = local.k0smotron ? { for i, w in data.nutanix_virtual_machine.worker : tostring(i) => w } : {}
   manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-machine.yaml.tftpl", {
     cluster_name = var.cluster_name
     namespace    = var.cluster_k0smotron_namespace
@@ -197,19 +192,22 @@ resource "kubernetes_manifest" "k0smotron_machine" {
 }
 
 resource "kubernetes_manifest" "k0smotron_remotemachine" {
-  for_each = var.cluster_mode == "k0smotron" ? { for i, w in data.nutanix_virtual_machine.worker : tostring(i) => w } : {}
+  for_each = local.k0smotron ? { for i, w in data.nutanix_virtual_machine.worker : tostring(i) => w } : {}
   manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-remotemachine.yaml.tftpl", {
     cluster_name = var.cluster_name
     namespace    = var.cluster_k0smotron_namespace
     index        = each.key
     worker_ip    = each.value.nic_list[0].ip_endpoint_list[0].ip
-    ssh_user     = local.users.1.name
+    ssh_user     = local.operator_user
   }))
-  depends_on = [kubernetes_secret.bootstrap_ssh]
+  depends_on = [
+    kubernetes_secret.bootstrap_ssh,
+    kubernetes_manifest.k0smotron_controlplane,
+  ]
 }
 
 resource "kubernetes_manifest" "k0smotron_workerconfig" {
-  for_each = var.cluster_mode == "k0smotron" ? { for i, w in data.nutanix_virtual_machine.worker : tostring(i) => w } : {}
+  for_each = local.k0smotron ? { for i, w in data.nutanix_virtual_machine.worker : tostring(i) => w } : {}
   manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-workerconfig.yaml.tftpl", {
     cluster_name = var.cluster_name
     namespace    = var.cluster_k0smotron_namespace
@@ -221,7 +219,7 @@ resource "kubernetes_manifest" "k0smotron_workerconfig" {
 # Wait for the hosted control plane to come up before reading its kubeconfig.
 # 15-minute timeout accommodates cold-start image pulls on a fresh mgmt cluster.
 resource "null_resource" "wait_control_plane" {
-  count = var.cluster_mode == "k0smotron" ? 1 : 0
+  count = local.k0smotron ? 1 : 0
 
   triggers = {
     cluster_name = var.cluster_name
@@ -235,7 +233,7 @@ resource "null_resource" "wait_control_plane" {
 }
 
 data "kubernetes_secret" "workload_kubeconfig" {
-  count = var.cluster_mode == "k0smotron" ? 1 : 0
+  count = local.k0smotron ? 1 : 0
 
   metadata {
     name      = "${var.cluster_name}-kubeconfig"
@@ -246,7 +244,7 @@ data "kubernetes_secret" "workload_kubeconfig" {
 }
 
 resource "local_sensitive_file" "workload_kubeconfig" {
-  count           = var.cluster_mode == "k0smotron" ? 1 : 0
+  count           = local.k0smotron ? 1 : 0
   content         = data.kubernetes_secret.workload_kubeconfig[0].data["value"]
   filename        = "${local.directories.secrets}/kubeconfig"
   file_permission = "0600"

@@ -1,8 +1,8 @@
 resource "local_sensitive_file" "k0sctl" {
-  count = var.cluster_mode == "vm" ? 1 : 0
+  count = local.vm_mode ? 1 : 0
   content = templatefile("${local.directories.templates}/k0sctl.tftpl",
     {
-      user = local.users.1.name
+      user = local.operator_user
 
       cluster_name     = var.cluster_name
       cluster_fqdn     = local.server_name
@@ -34,40 +34,28 @@ resource "local_sensitive_file" "user-data" {
 }
 
 resource "local_sensitive_file" "nutanix_csi_secret" {
-  count = var.cluster_mode == "vm" ? 1 : 0
-  content = templatefile("${local.directories.templates}/nutanix-csi-secret.yaml.tftpl", {
-    prism_endpoint       = var.nutanix_prism_central
-    nutanix_username     = var.nutanix_username
-    nutanix_password     = var.nutanix_password
-    storage_container    = var.nutanix_storage_container
-    file_server_fqdn     = var.nutanix_file_server_fqdn
-    file_server_username = var.nutanix_file_server_username
-    file_server_password = var.nutanix_file_server_password
-  })
+  count           = local.vm_mode ? 1 : 0
+  content         = local.nutanix_csi_secret_yaml
   filename        = "${local.directories.work}/manifests/01-nutanix-csi-secret.yaml"
   file_permission = "0600"
 }
 
 resource "local_sensitive_file" "nutanix_storageclass" {
-  count = var.cluster_mode == "vm" ? 1 : 0
-  content = templatefile("${local.directories.templates}/nutanix-storageclass.yaml.tftpl", {
-    storage_container = var.nutanix_storage_container
-  })
+  count           = local.vm_mode ? 1 : 0
+  content         = local.nutanix_storageclass_yaml
   filename        = "${local.directories.work}/manifests/02-nutanix-storageclass.yaml"
   file_permission = "0600"
 }
 
 resource "local_sensitive_file" "nutanix_files_storageclass" {
-  count = var.cluster_mode == "vm" ? 1 : 0
-  content = templatefile("${local.directories.templates}/nutanix-files-storageclass.yaml.tftpl", {
-    file_server = var.nutanix_file_server
-  })
+  count           = local.vm_mode ? 1 : 0
+  content         = local.nutanix_files_storageclass_yaml
   filename        = "${local.directories.work}/manifests/03-nutanix-files-storageclass.yaml"
   file_permission = "0600"
 }
 
 resource "local_sensitive_file" "ip_address_pool" {
-  count = var.cluster_mode == "vm" ? 1 : 0
+  count = local.vm_mode ? 1 : 0
   content = templatefile("${local.directories.templates}/default-ipaddresspool.yaml.tftpl",
     {
       load_balancer_cidr = var.load_balancer_cidr

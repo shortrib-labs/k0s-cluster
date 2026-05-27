@@ -29,5 +29,5 @@ output "workload_kubeconfig_secret" {
     name      = "${var.cluster_name}-kubeconfig"
     namespace = var.cluster_k0smotron_namespace
   } : null
-  description = "Mgmt-cluster Secret holding the workload cluster's admin kubeconfig (k0smotron mode only)."
+  description = "Mgmt-cluster Secret holding the workload cluster's admin kubeconfig (k0smotron mode only). Returns null in vm mode."
 }

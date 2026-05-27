@@ -31,7 +31,7 @@ locals {
         tls_private_key.bootstrap_ssh[*].public_key_openssh
       ))
       users = yamlencode(local.users)
-      user  = local.users.1.name
+      user  = local.operator_user
     }
   )
 }

@@ -81,6 +81,15 @@ You bring the management cluster and its supporting bits:
 * DNS: a CNAME (or A) record for `${cluster_name}.${domain}` pointing
   at that IP.
 
+### Verbose output
+
+By default `make` recipes run silently. To echo every command (helpful for
+debugging Make targets), set `VERBOSE=1`:
+
+```shell
+$ make cluster VERBOSE=1
+```
+
 ### Switching Modes
 
 Changing `cluster.mode` on a live cluster is destructive — the

@@ -187,4 +187,32 @@ locals {
     templates = "${path.module}/templates"
     work      = "${var.project_root}/work"
   }
+
+  # Mode predicates — derived once so resource count/for_each expressions stay
+  # focused on intent rather than re-spelling the comparison.
+  k0smotron = var.cluster_mode == "k0smotron"
+  vm_mode   = var.cluster_mode == "vm"
+
+  # Operator account name — index 1 in local.users is the non-root operator;
+  # k0sctl, RemoteMachine ssh_user, and cloud-init bootstrap all reference it.
+  operator_user = local.users[1].name
+
+  # Shared Nutanix CSI/StorageClass YAML — rendered once and consumed by both
+  # the VM-mode local_sensitive_file resources and the k0smotron Secret/CM
+  # delivery path so the workload cluster gets identical bootstrap content.
+  nutanix_csi_secret_yaml = templatefile("${path.module}/templates/nutanix-csi-secret.yaml.tftpl", {
+    prism_endpoint       = var.nutanix_prism_central
+    nutanix_username     = var.nutanix_username
+    nutanix_password     = var.nutanix_password
+    storage_container    = var.nutanix_storage_container
+    file_server_fqdn     = var.nutanix_file_server_fqdn
+    file_server_username = var.nutanix_file_server_username
+    file_server_password = var.nutanix_file_server_password
+  })
+  nutanix_storageclass_yaml = templatefile("${path.module}/templates/nutanix-storageclass.yaml.tftpl", {
+    storage_container = var.nutanix_storage_container
+  })
+  nutanix_files_storageclass_yaml = templatefile("${path.module}/templates/nutanix-files-storageclass.yaml.tftpl", {
+    file_server = var.nutanix_file_server
+  })
 }
