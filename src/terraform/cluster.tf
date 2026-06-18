@@ -65,3 +65,10 @@ resource "local_sensitive_file" "ip_address_pool" {
   )
   filename = "${local.directories.work}/manifests/00-default-ipaddresspool.yaml"
 }
+
+resource "local_sensitive_file" "cloudflare_api_token" {
+  count           = local.vm_mode ? 1 : 0
+  content         = local.cloudflare_api_token_yaml
+  filename        = "${local.directories.work}/manifests/01-cloudflare-api-token.yaml"
+  file_permission = "0600"
+}

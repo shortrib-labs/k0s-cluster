@@ -112,6 +112,21 @@ resource "kubernetes_config_map" "cert_manager" {
   }
 }
 
+resource "kubernetes_secret" "cloudflare_api_token" {
+  count = local.k0smotron ? 1 : 0
+
+  metadata {
+    name      = "${var.cluster_name}-cloudflare-api-token"
+    namespace = var.cluster_k0smotron_namespace
+  }
+
+  data = {
+    "01-cloudflare-api-token.yaml" = local.cloudflare_api_token_yaml
+  }
+
+  type = "Opaque"
+}
+
 resource "kubernetes_config_map" "acme" {
   count = local.k0smotron ? 1 : 0
 
@@ -172,6 +187,7 @@ resource "kubernetes_manifest" "k0smotron_controlplane" {
   }))
   depends_on = [
     kubernetes_secret.nutanix_csi,
+    kubernetes_secret.cloudflare_api_token,
     kubernetes_config_map.nutanix_csi_config,
     kubernetes_config_map.metallb_config,
     kubernetes_config_map.cert_manager,

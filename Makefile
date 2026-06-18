@@ -59,6 +59,8 @@ workload_subnet = "$(shell yq .nutanix.subnets.workload $(params_yaml))"
 
 tailscale_client_id = "$(shell sops --decrypt --extract '["tailscale"]["client_id"]' $(params_yaml))"
 tailscale_client_secret = "$(shell sops --decrypt --extract '["tailscale"]["client_secret"]' $(params_yaml))"
+
+cloudflare_api_key = "$(shell sops --decrypt --extract '["acme"]["cloudflare"]["api_key"]' $(params_yaml))"
 endef
 
 .PHONY: tfvars
@@ -83,18 +85,13 @@ nodes: $(tfvars) check-mode-switch
 ifeq ($(cluster_mode),k0smotron)
 .PHONY: cluster
 cluster: nodes
-	$(Q)until kubectl --kubeconfig=$(SECRETS_DIR)/kubeconfig get namespace cert-manager >/dev/null 2>&1; do echo "[cluster] waiting for cert-manager namespace..."; sleep 10; done
-	$(Q)sops --decrypt ${SECRETS_DIR}/cloudflare-api-token.yaml | kubectl --kubeconfig=$(SECRETS_DIR)/kubeconfig apply -n cert-manager -f -
 	$(Q)$(MAKE) post-cluster
 else
 .PHONY: cluster
 cluster: nodes
-	$(Q)mkdir -p work/manifests
-	$(Q)sops --decrypt ${SECRETS_DIR}/cloudflare-api-token.yaml > ${WORK_DIR}/manifests/01-cloudflare-api-token.yaml
 	$(Q)k0sctl apply --config ${SECRETS_DIR}/k0sctl.yaml
 	$(Q)k0sctl kubeconfig --config ${SECRETS_DIR}/k0sctl.yaml > ${SECRETS_DIR}/kubeconfig
 	$(Q)$(MAKE) post-cluster
-	$(Q)rm -rf work/manifests
 endif
 
 .PHONY: post-cluster

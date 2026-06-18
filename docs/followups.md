@@ -45,4 +45,8 @@ Acceptance:
 
 OAuth `clientId` and `clientSecret` are rendered inline into the K0smotronControlPlane CR on the mgmt cluster, where anyone with `get k0smotroncontrolplane` permission in the namespace can read them. Confirmed via k0s docs that the helm extension supports only inline `values:` strings — `configFrom.secretRef` covers chart repository credentials, not chart values, so an in-place Secret-mount refactor is not possible against the current k0s release.
 
-Acceptance: design a follow-up that either (a) waits for upstream k0s to add `valuesFrom` support to the helm extension, (b) switches Tailscale operator config delivery to a workload-cluster Secret applied after kubeconfig fetch (similar to the existing cloudflare-api-token pattern in the Makefile), or (c) accepts the current visibility and documents the mgmt-cluster namespace RBAC requirement in the README's k0smotron prerequisites section.
+Acceptance: design a follow-up that either (a) waits for upstream k0s to add `valuesFrom` support to the helm extension, (b) switches Tailscale operator config delivery to a workload-cluster Secret applied after kubeconfig fetch, or (c) accepts the current visibility and documents the mgmt-cluster namespace RBAC requirement in the README's k0smotron prerequisites section.
+
+## Resolved items
+
+- **F3 (cloudflare-api-token race vs cert-manager namespace)** — resolved by promoting the Cloudflare API token to `acme.cloudflare.api_key` in params.yaml. The token now ships as a `local_sensitive_file` in vm mode and as a mgmt-cluster `kubernetes_secret` referenced from `K0smotronControlPlane.spec.manifests` in k0smotron mode. The Makefile no longer runs `sops --decrypt | kubectl apply -n cert-manager`, so the cert-manager-namespace-not-yet-created race condition cannot occur.

@@ -89,6 +89,9 @@ spec:
     - name: acme
       configMap:
         name: ${cluster_name}-acme
+    - name: cloudflare-api-token
+      secret:
+        secretName: ${cluster_name}-cloudflare-api-token
 %{ if enable_runtimes ~}
     - name: runtimes
       configMap:

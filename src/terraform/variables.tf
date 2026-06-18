@@ -177,6 +177,12 @@ variable "tailscale_client_secret" {
   type = string
 }
 
+variable "cloudflare_api_key" {
+  type        = string
+  sensitive   = true
+  description = "Cloudflare API token used by cert-manager's ACME DNS-01 challenge. Needs Zone:DNS:Edit scope on the served zones."
+}
+
 
 locals {
   vm_prefix   = var.cluster_name
@@ -215,5 +221,8 @@ locals {
   })
   nutanix_files_storageclass_yaml = templatefile("${path.module}/templates/nutanix-files-storageclass.yaml.tftpl", {
     file_server = var.nutanix_file_server
+  })
+  cloudflare_api_token_yaml = templatefile("${path.module}/templates/cloudflare-api-token.yaml.tftpl", {
+    cloudflare_api_key = var.cloudflare_api_key
   })
 }
