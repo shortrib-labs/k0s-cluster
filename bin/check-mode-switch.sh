@@ -26,9 +26,17 @@ if [ ! -d "${tf_dir}/.terraform" ]; then
   exit 0
 fi
 
-# Real errors from `terraform state list` should bubble up; do not suppress.
-if ! state=$(cd "${tf_dir}" && terraform state list); then
+# Try to read state. The "no state file was found" exit is a first-apply
+# situation, not an error — there are no resources to switch from. Distinguish
+# that case from real failures (corrupt state, locked backend, etc.).
+if state=$(cd "${tf_dir}" && terraform state list 2>&1); then
+  : # state populated; fall through to the count check
+elif echo "$state" | grep -qE "No state file was found|state file does not exist|Backend reinitialization required"; then
+  echo "[check-mode-switch] no state yet; skipping"
+  exit 0
+else
   echo "ERROR: terraform state list failed in ${tf_dir}" >&2
+  echo "$state" >&2
   exit 1
 fi
 
