@@ -23,6 +23,8 @@ resource "local_sensitive_file" "k0sctl" {
 
       tailscale_client_id     = var.tailscale_client_id
       tailscale_client_secret = var.tailscale_client_secret
+
+      version = var.cluster_version
     }
   )
   filename = "${local.directories.secrets}/k0sctl.yaml"

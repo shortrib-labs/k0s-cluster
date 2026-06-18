@@ -54,9 +54,10 @@ variable "cluster_k0smotron_external_ip" {
   }
 }
 
-variable "cluster_k0smotron_k0s_version" {
-  type    = string
-  default = "v1.35.2+k0s.0"
+variable "cluster_version" {
+  type        = string
+  default     = "1.35.2+k0s.0"
+  description = "k0s version installed by both vm mode (via k0sctl) and k0smotron mode (via K0smotronControlPlane.spec.version). No leading `v` — k0sctl rejects the v-prefix form."
 }
 
 variable "cluster_image_name" {

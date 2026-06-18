@@ -164,7 +164,7 @@ resource "kubernetes_manifest" "k0smotron_controlplane" {
     cluster_name            = var.cluster_name
     namespace               = var.cluster_k0smotron_namespace
     external_ip             = var.cluster_k0smotron_external_ip
-    k0s_version             = var.cluster_k0smotron_k0s_version
+    k0s_version             = "v${var.cluster_version}"
     cluster_fqdn            = local.server_name
     tailscale_client_id     = var.tailscale_client_id
     tailscale_client_secret = var.tailscale_client_secret
@@ -212,7 +212,7 @@ resource "kubernetes_manifest" "k0smotron_workerconfig" {
     cluster_name = var.cluster_name
     namespace    = var.cluster_k0smotron_namespace
     index        = each.key
-    k0s_version  = var.cluster_k0smotron_k0s_version
+    k0s_version  = "v${var.cluster_version}"
   }))
 }
 

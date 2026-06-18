@@ -43,7 +43,7 @@ cluster_mode = "$(shell yq ".cluster.mode // \"vm\"" $(params_yaml))"
 cluster_k0smotron_kubeconfig = "$(shell yq ".cluster.k0smotron.management_kubeconfig // \"\"" $(params_yaml))"
 cluster_k0smotron_namespace = "$(shell yq ".cluster.k0smotron.namespace // \"clusters\"" $(params_yaml))"
 cluster_k0smotron_external_ip = "$(shell yq ".cluster.k0smotron.external_ip // \"\"" $(params_yaml))"
-cluster_k0smotron_k0s_version = "$(shell yq ".cluster.k0smotron.k0s_version // \"v1.35.2+k0s.0\"" $(params_yaml))"
+cluster_version = "$(shell yq ".cluster.version // \"1.35.2+k0s.0\"" $(params_yaml))"
 
 nutanix_username = "$(shell yq .nutanix.username $(params_yaml))"
 nutanix_password = "$(shell sops --decrypt --extract '["nutanix"]["password"]' $(params_yaml))"
