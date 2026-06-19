@@ -20,6 +20,46 @@ variable "workers" {
   default = 0
 }
 
+variable "cluster_mode" {
+  type    = string
+  default = "vm"
+  validation {
+    condition     = contains(["vm", "k0smotron"], var.cluster_mode)
+    error_message = "cluster_mode must be \"vm\" or \"k0smotron\"."
+  }
+}
+
+variable "cluster_k0smotron_kubeconfig" {
+  type        = string
+  default     = ""
+  description = "Path to kubeconfig for the management cluster hosting the k0smotron control plane. Required when cluster_mode = k0smotron."
+  validation {
+    condition     = var.cluster_mode != "k0smotron" || var.cluster_k0smotron_kubeconfig != ""
+    error_message = "cluster_k0smotron_kubeconfig must be set when cluster_mode is \"k0smotron\"."
+  }
+}
+
+variable "cluster_k0smotron_namespace" {
+  type    = string
+  default = "clusters"
+}
+
+variable "cluster_k0smotron_external_ip" {
+  type        = string
+  default     = ""
+  description = "Pre-reserved MetalLB IP on the mgmt cluster for the hosted apiserver. Required when cluster_mode = k0smotron."
+  validation {
+    condition     = var.cluster_mode != "k0smotron" || var.cluster_k0smotron_external_ip != ""
+    error_message = "cluster_k0smotron_external_ip must be set when cluster_mode is \"k0smotron\"."
+  }
+}
+
+variable "cluster_version" {
+  type        = string
+  default     = "1.35.2+k0s.0"
+  description = "k0s version installed by both vm mode (via k0sctl) and k0smotron mode (via K0smotronControlPlane.spec.version). No leading `v` — k0sctl rejects the v-prefix form."
+}
+
 variable "cluster_image_name" {
   type = string
 }
@@ -137,6 +177,12 @@ variable "tailscale_client_secret" {
   type = string
 }
 
+variable "cloudflare_api_key" {
+  type        = string
+  sensitive   = true
+  description = "Cloudflare API token used by cert-manager's ACME DNS-01 challenge. Needs Zone:DNS:Edit scope on the served zones."
+}
+
 
 locals {
   vm_prefix   = var.cluster_name
@@ -148,4 +194,35 @@ locals {
     templates = "${path.module}/templates"
     work      = "${var.project_root}/work"
   }
+
+  # Mode predicates — derived once so resource count/for_each expressions stay
+  # focused on intent rather than re-spelling the comparison.
+  k0smotron = var.cluster_mode == "k0smotron"
+  vm_mode   = var.cluster_mode == "vm"
+
+  # Operator account name — index 1 in local.users is the non-root operator;
+  # k0sctl, RemoteMachine ssh_user, and cloud-init bootstrap all reference it.
+  operator_user = local.users[1].name
+
+  # Shared Nutanix CSI/StorageClass YAML — rendered once and consumed by both
+  # the VM-mode local_sensitive_file resources and the k0smotron Secret/CM
+  # delivery path so the workload cluster gets identical bootstrap content.
+  nutanix_csi_secret_yaml = templatefile("${path.module}/templates/nutanix-csi-secret.yaml.tftpl", {
+    prism_endpoint       = var.nutanix_prism_central
+    nutanix_username     = var.nutanix_username
+    nutanix_password     = var.nutanix_password
+    storage_container    = var.nutanix_storage_container
+    file_server_fqdn     = var.nutanix_file_server_fqdn
+    file_server_username = var.nutanix_file_server_username
+    file_server_password = var.nutanix_file_server_password
+  })
+  nutanix_storageclass_yaml = templatefile("${path.module}/templates/nutanix-storageclass.yaml.tftpl", {
+    storage_container = var.nutanix_storage_container
+  })
+  nutanix_files_storageclass_yaml = templatefile("${path.module}/templates/nutanix-files-storageclass.yaml.tftpl", {
+    file_server = var.nutanix_file_server
+  })
+  cloudflare_api_token_yaml = templatefile("${path.module}/templates/cloudflare-api-token.yaml.tftpl", {
+    cloudflare_api_key = var.cloudflare_api_key
+  })
 }

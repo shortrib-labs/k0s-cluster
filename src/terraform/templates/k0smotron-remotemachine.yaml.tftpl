@@ -1,0 +1,17 @@
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: RemoteMachine
+metadata:
+  name: ${cluster_name}-worker-${index}
+  namespace: ${namespace}
+spec:
+  address: ${worker_ip}
+  port: 22
+  user: ${ssh_user}
+  useSudo: true
+  # Bundle the install steps into one script and exec under sudo so the whole
+  # pipeline (curl ... | sh) runs as root. With this false, only the curl half
+  # is sudo'd, the piped sh runs as ${ssh_user}, and writes to /usr/local/bin
+  # fail with "Permission denied".
+  commandsAsScript: true
+  sshKeyRef:
+    name: ${cluster_name}-bootstrap-ssh

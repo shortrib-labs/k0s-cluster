@@ -4,6 +4,8 @@ params_yaml := ${SECRETS_DIR}/params.yaml
 cluster_name := $(shell yq .cluster_name $(params_yaml))
 domain := $(shell yq .domain $(params_yaml))
 cluster_fqdn := $(cluster_name).$(domain)
+cluster_mode := $(shell yq ".cluster.mode // \"vm\"" $(params_yaml))
+cluster_k0smotron_kubeconfig := $(shell yq ".cluster.k0smotron.management_kubeconfig // \"\"" $(params_yaml))
 
 define TFVARS
 cluster_name				 = "$(cluster_name)"
@@ -28,6 +30,12 @@ load_balancer_cidr	  = "$(shell yq .cluster.load_balancer_cidr $(params_yaml))"
 enable_gvisor = "$(shell yq '.cluster.runtimes.gvisor.enabled // false' $(params_yaml))"
 enable_wasm = "$(shell yq '.cluster.runtimes.wasm.enabled // false' $(params_yaml))"
 
+cluster_mode = "$(shell yq ".cluster.mode // \"vm\"" $(params_yaml))"
+cluster_k0smotron_kubeconfig = "$(PROJECT_DIR)/$(shell yq ".cluster.k0smotron.management_kubeconfig // \"\"" $(params_yaml))"
+cluster_k0smotron_namespace = "$(shell yq ".cluster.k0smotron.namespace // \"clusters\"" $(params_yaml))"
+cluster_k0smotron_external_ip = "$(shell yq ".cluster.k0smotron.external_ip // \"\"" $(params_yaml))"
+cluster_version = "$(shell yq ".cluster.version // \"1.35.2+k0s.0\"" $(params_yaml))"
+
 nutanix_username = "$(shell yq .nutanix.username $(params_yaml))"
 nutanix_password = "$(shell sops --decrypt --extract '["nutanix"]["password"]' $(params_yaml))"
 nutanix_prism_central = "$(shell yq .nutanix.prism_central $(params_yaml))"
@@ -42,6 +50,8 @@ workload_subnet = "$(shell yq .nutanix.subnets.workload $(params_yaml))"
 
 tailscale_client_id = "$(shell sops --decrypt --extract '["tailscale"]["client_id"]' $(params_yaml))"
 tailscale_client_secret = "$(shell sops --decrypt --extract '["tailscale"]["client_secret"]' $(params_yaml))"
+
+cloudflare_api_key = "$(shell sops --decrypt --extract '["acme"]["cloudflare"]["api_key"]' $(params_yaml))"
 endef
 
 .PHONY: tfvars
@@ -61,32 +71,35 @@ nodes: $(tfvars)
 
 .PHONY: cluster
 cluster: nodes
-	@mkdir -p work/manifests
-	@sops --decrypt ${SECRETS_DIR}/cloudflare-api-token.yaml > ${WORK_DIR}/manifests/01-cloudflare-api-token.yaml
-	@k0sctl apply --config ${SECRETS_DIR}/k0sctl.yaml
-	@k0sctl kubeconfig --config ${SECRETS_DIR}/k0sctl.yaml > ${SECRETS_DIR}/kubeconfig
+	@if [ "$(cluster_mode)" = "vm" ]; then \
+	  k0sctl apply --config ${SECRETS_DIR}/k0sctl.yaml && \
+	  k0sctl kubeconfig --config ${SECRETS_DIR}/k0sctl.yaml > ${SECRETS_DIR}/kubeconfig; \
+	fi
 	@export KUBECONFIG=${SECRETS_DIR}/kubeconfig && tailscale configure kubeconfig $(cluster_name)-operator
-	@yq -i '.contexts[] |= (select(.name == "$(cluster_name)-operator.walrus-shark.ts.net").name = "tailscale-auth@$(cluster_name)" // .) | .contexts[] |= (select(.name == "$(cluster_name)").name = "$(cluster_name)-admin@$(cluster_name)" // .) | .contexts[] |= (select(.context.user == "admin").context.user = "$(cluster_name)-admin" // .) | .users[] |= (select(.name == "admin").name = "$(cluster_name)-admin" // .) | .current-context = "$(cluster_name)-admin@$(cluster_name)"' ${SECRETS_DIR}/kubeconfig
-	@rm -rf work/manifests
+	@yq -i '.clusters[] |= (select(.name == "$(cluster_name)-k0s").name = "$(cluster_name)" // .) | .contexts[] |= (select(.context.cluster == "$(cluster_name)-k0s").context.cluster = "$(cluster_name)" // .) | .contexts[] |= (select(.context.user == "admin").context.user = "$(cluster_name)-admin" // .) | .contexts[] |= (select(.name == "$(cluster_name)").name = "$(cluster_name)-admin@$(cluster_name)" // .) | .contexts[] |= (select(.name == "$(cluster_name)-admin@$(cluster_name)-k0s").name = "$(cluster_name)-admin@$(cluster_name)" // .) | .contexts[] |= (select(.name == "$(cluster_name)-operator.walrus-shark.ts.net").name = "tailscale-auth@$(cluster_name)" // .) | .users[] |= (select(.name == "admin").name = "$(cluster_name)-admin" // .) | .current-context = "$(cluster_name)-admin@$(cluster_name)"' ${SECRETS_DIR}/kubeconfig
 
 .PHONY: test
 test: $(tfvars)
+	@if [ "$(cluster_mode)" = "k0smotron" ]; then \
+	  test -n "$(cluster_k0smotron_kubeconfig)" || (echo "ERROR: cluster.k0smotron.management_kubeconfig is unset"; exit 1); \
+	  kubectl --kubeconfig=$(cluster_k0smotron_kubeconfig) cluster-info; \
+	fi
 	@(cd ${SOURCE_DIR}/terraform && terraform plan -var-file $(tfvars))
 
 .PHONY: destroy
 destroy: $(tfvars)
-	@# Remove host keys before destroying (IPs will be gone after)
+	@# Remove worker host keys before destroying (IPs will be gone after)
 	@(cd ${SOURCE_DIR}/terraform && terraform state list 2>/dev/null | grep nutanix_virtual_machine | xargs -I{} terraform state show {} 2>/dev/null | grep -oP 'ip\s*=\s*"\K[^"]+' | xargs -I{} ssh-keygen -R {} 2>/dev/null || true)
-	@ssh-keygen -R $(cluster_fqdn) 2>/dev/null || true
+	@if [ "$(cluster_mode)" = "vm" ]; then ssh-keygen -R $(cluster_fqdn) 2>/dev/null || true; fi
 	@(cd ${SOURCE_DIR}/terraform && terraform destroy -var-file $(tfvars) --auto-approve)
 
 clean:
 	@rm $(tfvars)
 
 .PHONY: encrypt
-encrypt: 
+encrypt:
 	@sops --encrypt --in-place $(params_yaml)
 
 .PHONY: decrypt
-decrypt: 
+decrypt:
 	@sops --decrypt --in-place $(params_yaml)

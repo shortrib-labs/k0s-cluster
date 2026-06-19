@@ -1,0 +1,16 @@
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Machine
+metadata:
+  name: ${cluster_name}-worker-${index}
+  namespace: ${namespace}
+spec:
+  clusterName: ${cluster_name}
+  bootstrap:
+    configRef:
+      apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+      kind: K0sWorkerConfig
+      name: ${cluster_name}-worker-${index}
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: RemoteMachine
+    name: ${cluster_name}-worker-${index}

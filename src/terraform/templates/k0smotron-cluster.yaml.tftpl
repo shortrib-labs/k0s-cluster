@@ -1,0 +1,14 @@
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: ${cluster_name}
+  namespace: ${namespace}
+spec:
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    kind: K0smotronControlPlane
+    name: ${cluster_name}
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: RemoteCluster
+    name: ${cluster_name}

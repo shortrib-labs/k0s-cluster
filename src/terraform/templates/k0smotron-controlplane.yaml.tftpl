@@ -1,0 +1,100 @@
+apiVersion: controlplane.cluster.x-k8s.io/v1beta2
+kind: K0smotronControlPlane
+metadata:
+  name: ${cluster_name}
+  namespace: ${namespace}
+spec:
+  version: ${k0s_version}
+  replicas: 1
+  externalAddress: ${external_ip}
+  service:
+    type: LoadBalancer
+    apiPort: 6443
+    konnectivityPort: 8132
+  k0sConfig:
+    apiVersion: k0s.k0sproject.io/v1beta1
+    kind: ClusterConfig
+    spec:
+      api:
+        externalAddress: ${external_ip}
+        sans:
+          - ${cluster_fqdn}
+      network:
+        provider: calico
+        calico:
+          overlay: CrossSubnet
+          wireguard: true
+        podCIDR: 10.244.0.0/16
+        serviceCIDR: 10.96.0.0/12
+      extensions:
+        helm:
+          repositories:
+          - name: metallb
+            url: https://metallb.github.io/metallb
+          - name: tailscale
+            url: https://pkgs.tailscale.com/helmcharts
+          - name: nutanix
+            url: https://nutanix.github.io/helm-releases
+          charts:
+          - name: nutanix-csi-storage
+            chartname: nutanix/nutanix-csi-storage
+            version: "3.3.9"
+            namespace: kube-system
+            order: 5
+            values: |
+              storageClass:
+                enabled: true
+              createSecret: false
+              createPrismCentralSecret: false
+              createVolumeSnapshotClass: false
+              kubeletDir: /var/lib/k0s/kubelet
+          - name: metallb
+            chartname: metallb/metallb
+            namespace: metallb
+            order: 0
+          - name: tailscale-operator
+            chartname: tailscale/tailscale-operator
+            namespace: tailscale
+            values: |
+              operatorConfig:
+                hostname: ${cluster_name}-operator
+              oauth:
+                clientId: ${tailscale_client_id}
+                clientSecret: ${tailscale_client_secret}
+              apiServerProxyConfig:
+                mode: "true"
+            order: 10
+          - name: traefik
+            chartname: oci://ghcr.io/traefik/helm/traefik
+            namespace: traefik
+            order: 20
+  manifests:
+    - name: nutanix-csi-secret
+      secret:
+        secretName: ${cluster_name}-nutanix-csi-secret
+    - name: nutanix-csi-config
+      configMap:
+        name: ${cluster_name}-nutanix-csi-config
+    - name: metallb-config
+      configMap:
+        name: ${cluster_name}-metallb-config
+    - name: cert-manager-crds-core
+      configMap:
+        name: ${cluster_name}-cert-manager-crds-core
+    - name: cert-manager-crds-acme
+      configMap:
+        name: ${cluster_name}-cert-manager-crds-acme
+    - name: cert-manager
+      configMap:
+        name: ${cluster_name}-cert-manager
+    - name: acme
+      configMap:
+        name: ${cluster_name}-acme
+    - name: cloudflare-api-token
+      secret:
+        secretName: ${cluster_name}-cloudflare-api-token
+%{ if enable_runtimes ~}
+    - name: runtimes
+      configMap:
+        name: ${cluster_name}-runtimes
+%{ endif ~}

@@ -1,0 +1,14 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: ${cluster_name}
+  namespace: ${namespace}
+spec:
+  addresses:
+  - ${external_ip}/32
+  serviceAllocation:
+    namespaces:
+    - ${k0smotron_namespace}
+    serviceSelectors:
+    - matchLabels:
+        cluster.x-k8s.io/cluster-name: ${cluster_name}
