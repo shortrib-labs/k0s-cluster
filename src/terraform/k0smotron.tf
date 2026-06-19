@@ -1,3 +1,45 @@
+# Fail-fast guards: confirm the management cluster has the namespaces where
+# this cluster's CRs (clusters/), per-cluster MetalLB pool (metallb/) and
+# bootstrap ConfigMaps will live. Capybara owns the namespaces' lifecycle, not
+# this terraform — plan errors here mean capybara isn't ready.
+data "kubernetes_namespace" "k0smotron" {
+  count = local.k0smotron ? 1 : 0
+  metadata {
+    name = var.cluster_k0smotron_namespace
+  }
+}
+
+data "kubernetes_namespace" "metallb" {
+  count = local.k0smotron ? 1 : 0
+  metadata {
+    name = "metallb"
+  }
+}
+
+# Per-cluster MetalLB IPAddressPool and L2Advertisement on the mgmt cluster.
+# A single /32 pool scoped (by namespace + cluster-name label) to this workload
+# cluster's hosted apiserver LB Service, so the LB lands deterministically on
+# var.cluster_k0smotron_external_ip rather than whatever the default pool picks.
+# Pool must exist before k0smotron creates the LB Service.
+resource "kubectl_manifest" "metallb_ipaddresspool" {
+  count = local.k0smotron ? 1 : 0
+  yaml_body = templatefile("${local.directories.templates}/metallb-ipaddresspool.yaml.tftpl", {
+    cluster_name        = var.cluster_name
+    namespace           = data.kubernetes_namespace.metallb[0].metadata[0].name
+    external_ip         = var.cluster_k0smotron_external_ip
+    k0smotron_namespace = data.kubernetes_namespace.k0smotron[0].metadata[0].name
+  })
+}
+
+resource "kubectl_manifest" "metallb_l2advertisement" {
+  count = local.k0smotron ? 1 : 0
+  yaml_body = templatefile("${local.directories.templates}/metallb-l2advertisement.yaml.tftpl", {
+    cluster_name = var.cluster_name
+    namespace    = data.kubernetes_namespace.metallb[0].metadata[0].name
+  })
+  depends_on = [kubectl_manifest.metallb_ipaddresspool]
+}
+
 # Bootstrap SSH keypair for k0smotron RemoteMachine worker join.
 # Public half is injected into worker cloud-init alongside operator keys.
 # Private half is staged as a Secret on the management cluster so the
@@ -13,7 +55,7 @@ resource "kubernetes_secret" "bootstrap_ssh" {
 
   metadata {
     name      = "${var.cluster_name}-bootstrap-ssh"
-    namespace = var.cluster_k0smotron_namespace
+    namespace = data.kubernetes_namespace.k0smotron[0].metadata[0].name
   }
 
   data = {
@@ -34,7 +76,7 @@ resource "kubernetes_secret" "nutanix_csi" {
 
   metadata {
     name      = "${var.cluster_name}-nutanix-csi-secret"
-    namespace = var.cluster_k0smotron_namespace
+    namespace = data.kubernetes_namespace.k0smotron[0].metadata[0].name
   }
 
   data = {
@@ -49,7 +91,7 @@ resource "kubernetes_config_map" "nutanix_csi_config" {
 
   metadata {
     name      = "${var.cluster_name}-nutanix-csi-config"
-    namespace = var.cluster_k0smotron_namespace
+    namespace = data.kubernetes_namespace.k0smotron[0].metadata[0].name
   }
 
   data = {
@@ -63,7 +105,7 @@ resource "kubernetes_config_map" "metallb_config" {
 
   metadata {
     name      = "${var.cluster_name}-metallb-config"
-    namespace = var.cluster_k0smotron_namespace
+    namespace = data.kubernetes_namespace.k0smotron[0].metadata[0].name
   }
 
   data = merge(
@@ -77,24 +119,46 @@ resource "kubernetes_config_map" "metallb_config" {
   )
 }
 
-# Cert-manager CRDs and workload manifests live in separate ConfigMaps because
-# the combined upstream YAML (~993 KiB) exceeds the 1 MiB ConfigMap size limit.
-resource "kubernetes_config_map" "cert_manager_crds" {
+# Cert-manager CRDs are split by API group (cert-manager.io core vs
+# acme.cert-manager.io) because the combined upstream bundle exceeds the 1 MiB
+# ConfigMap size limit. The workload manifest is a third ConfigMap reconciled
+# after the CRDs.
+resource "kubernetes_config_map" "cert_manager_crds_core" {
   count = local.k0smotron ? 1 : 0
 
   metadata {
-    name      = "${var.cluster_name}-cert-manager-crds"
-    namespace = var.cluster_k0smotron_namespace
+    name      = "${var.cluster_name}-cert-manager-crds-core"
+    namespace = data.kubernetes_namespace.k0smotron[0].metadata[0].name
   }
 
   data = {
-    "00-cert-manager-crds.yaml" = file("${local.directories.manifests}/cert-manager/00-cert-manager-crds.yaml")
+    "00-cert-manager-crds-core.yaml" = file("${local.directories.manifests}/cert-manager/00-cert-manager-crds-core.yaml")
   }
 
   lifecycle {
     precondition {
-      condition     = length(file("${local.directories.manifests}/cert-manager/00-cert-manager-crds.yaml")) < 950000
-      error_message = "manifests/cert-manager/00-cert-manager-crds.yaml exceeds 950000 bytes — too close to the 1 MiB ConfigMap limit. Split the file or update cert-manager to a smaller bundle."
+      condition     = length(file("${local.directories.manifests}/cert-manager/00-cert-manager-crds-core.yaml")) < 950000
+      error_message = "manifests/cert-manager/00-cert-manager-crds-core.yaml exceeds 950000 bytes — too close to the 1 MiB ConfigMap limit. Re-split the bundle."
+    }
+  }
+}
+
+resource "kubernetes_config_map" "cert_manager_crds_acme" {
+  count = local.k0smotron ? 1 : 0
+
+  metadata {
+    name      = "${var.cluster_name}-cert-manager-crds-acme"
+    namespace = data.kubernetes_namespace.k0smotron[0].metadata[0].name
+  }
+
+  data = {
+    "01-cert-manager-crds-acme.yaml" = file("${local.directories.manifests}/cert-manager/01-cert-manager-crds-acme.yaml")
+  }
+
+  lifecycle {
+    precondition {
+      condition     = length(file("${local.directories.manifests}/cert-manager/01-cert-manager-crds-acme.yaml")) < 950000
+      error_message = "manifests/cert-manager/01-cert-manager-crds-acme.yaml exceeds 950000 bytes — too close to the 1 MiB ConfigMap limit. Re-split the bundle."
     }
   }
 }
@@ -104,11 +168,11 @@ resource "kubernetes_config_map" "cert_manager" {
 
   metadata {
     name      = "${var.cluster_name}-cert-manager"
-    namespace = var.cluster_k0smotron_namespace
+    namespace = data.kubernetes_namespace.k0smotron[0].metadata[0].name
   }
 
   data = {
-    "01-cert-manager.yaml" = file("${local.directories.manifests}/cert-manager/01-cert-manager.yaml")
+    "02-cert-manager.yaml" = file("${local.directories.manifests}/cert-manager/02-cert-manager.yaml")
   }
 }
 
@@ -117,7 +181,7 @@ resource "kubernetes_secret" "cloudflare_api_token" {
 
   metadata {
     name      = "${var.cluster_name}-cloudflare-api-token"
-    namespace = var.cluster_k0smotron_namespace
+    namespace = data.kubernetes_namespace.k0smotron[0].metadata[0].name
   }
 
   data = {
@@ -132,7 +196,7 @@ resource "kubernetes_config_map" "acme" {
 
   metadata {
     name      = "${var.cluster_name}-acme"
-    namespace = var.cluster_k0smotron_namespace
+    namespace = data.kubernetes_namespace.k0smotron[0].metadata[0].name
   }
 
   data = { for f in fileset(local.directories.manifests, "acme/*.yaml") : basename(f) => file("${local.directories.manifests}/${f}") }
@@ -144,7 +208,7 @@ resource "kubernetes_config_map" "runtimes" {
 
   metadata {
     name      = "${var.cluster_name}-runtimes"
-    namespace = var.cluster_k0smotron_namespace
+    namespace = data.kubernetes_namespace.k0smotron[0].metadata[0].name
   }
 
   data = merge(
@@ -157,79 +221,86 @@ resource "kubernetes_config_map" "runtimes" {
 # on the mgmt cluster. K0smotronControlPlane reconciles the hosted apiserver
 # pods. Per-worker Machine/RemoteMachine/K0sWorkerConfig triplets cause the
 # k0smotron CAPI infra provider to SSH into each worker VM and install k0s.
-resource "kubernetes_manifest" "k0smotron_cluster" {
+#
+# These use kubectl_manifest (alekc/kubectl) rather than kubernetes_manifest so
+# that resources referencing values known-after-apply (e.g. worker IPs from the
+# nutanix data source) don't fail plan-time schema validation.
+resource "kubectl_manifest" "k0smotron_cluster" {
   count = local.k0smotron ? 1 : 0
-  manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-cluster.yaml.tftpl", {
+  yaml_body = templatefile("${local.directories.templates}/k0smotron-cluster.yaml.tftpl", {
     cluster_name = var.cluster_name
-    namespace    = var.cluster_k0smotron_namespace
-  }))
+    namespace    = data.kubernetes_namespace.k0smotron[0].metadata[0].name
+  })
 }
 
-resource "kubernetes_manifest" "k0smotron_remotecluster" {
+resource "kubectl_manifest" "k0smotron_remotecluster" {
   count = local.k0smotron ? 1 : 0
-  manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-remotecluster.yaml.tftpl", {
+  yaml_body = templatefile("${local.directories.templates}/k0smotron-remotecluster.yaml.tftpl", {
     cluster_name = var.cluster_name
-    namespace    = var.cluster_k0smotron_namespace
-  }))
+    namespace    = data.kubernetes_namespace.k0smotron[0].metadata[0].name
+  })
 }
 
-resource "kubernetes_manifest" "k0smotron_controlplane" {
+resource "kubectl_manifest" "k0smotron_controlplane" {
   count = local.k0smotron ? 1 : 0
-  manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-controlplane.yaml.tftpl", {
+  yaml_body = templatefile("${local.directories.templates}/k0smotron-controlplane.yaml.tftpl", {
     cluster_name            = var.cluster_name
-    namespace               = var.cluster_k0smotron_namespace
+    namespace               = data.kubernetes_namespace.k0smotron[0].metadata[0].name
     external_ip             = var.cluster_k0smotron_external_ip
     k0s_version             = "v${var.cluster_version}"
     cluster_fqdn            = local.server_name
     tailscale_client_id     = var.tailscale_client_id
     tailscale_client_secret = var.tailscale_client_secret
     enable_runtimes         = var.enable_gvisor || var.enable_wasm
-  }))
+  })
   depends_on = [
     kubernetes_secret.nutanix_csi,
     kubernetes_secret.cloudflare_api_token,
     kubernetes_config_map.nutanix_csi_config,
     kubernetes_config_map.metallb_config,
     kubernetes_config_map.cert_manager,
-    kubernetes_config_map.cert_manager_crds,
+    kubernetes_config_map.cert_manager_crds_core,
+    kubernetes_config_map.cert_manager_crds_acme,
     kubernetes_config_map.acme,
     kubernetes_config_map.runtimes,
+    kubectl_manifest.metallb_ipaddresspool,
+    kubectl_manifest.metallb_l2advertisement,
   ]
 }
 
-resource "kubernetes_manifest" "k0smotron_machine" {
+resource "kubectl_manifest" "k0smotron_machine" {
   for_each = local.k0smotron ? { for i, w in data.nutanix_virtual_machine.worker : tostring(i) => w } : {}
-  manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-machine.yaml.tftpl", {
+  yaml_body = templatefile("${local.directories.templates}/k0smotron-machine.yaml.tftpl", {
     cluster_name = var.cluster_name
-    namespace    = var.cluster_k0smotron_namespace
+    namespace    = data.kubernetes_namespace.k0smotron[0].metadata[0].name
     index        = each.key
-  }))
-  depends_on = [kubernetes_manifest.k0smotron_cluster]
+  })
+  depends_on = [kubectl_manifest.k0smotron_cluster]
 }
 
-resource "kubernetes_manifest" "k0smotron_remotemachine" {
+resource "kubectl_manifest" "k0smotron_remotemachine" {
   for_each = local.k0smotron ? { for i, w in data.nutanix_virtual_machine.worker : tostring(i) => w } : {}
-  manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-remotemachine.yaml.tftpl", {
+  yaml_body = templatefile("${local.directories.templates}/k0smotron-remotemachine.yaml.tftpl", {
     cluster_name = var.cluster_name
-    namespace    = var.cluster_k0smotron_namespace
+    namespace    = data.kubernetes_namespace.k0smotron[0].metadata[0].name
     index        = each.key
     worker_ip    = each.value.nic_list[0].ip_endpoint_list[0].ip
-    ssh_user     = local.operator_user
-  }))
+    ssh_user     = "ubuntu"
+  })
   depends_on = [
     kubernetes_secret.bootstrap_ssh,
-    kubernetes_manifest.k0smotron_controlplane,
+    kubectl_manifest.k0smotron_controlplane,
   ]
 }
 
-resource "kubernetes_manifest" "k0smotron_workerconfig" {
+resource "kubectl_manifest" "k0smotron_workerconfig" {
   for_each = local.k0smotron ? { for i, w in data.nutanix_virtual_machine.worker : tostring(i) => w } : {}
-  manifest = yamldecode(templatefile("${local.directories.templates}/k0smotron-workerconfig.yaml.tftpl", {
+  yaml_body = templatefile("${local.directories.templates}/k0smotron-workerconfig.yaml.tftpl", {
     cluster_name = var.cluster_name
-    namespace    = var.cluster_k0smotron_namespace
+    namespace    = data.kubernetes_namespace.k0smotron[0].metadata[0].name
     index        = each.key
     k0s_version  = "v${var.cluster_version}"
-  }))
+  })
 }
 
 # Wait for the hosted control plane to come up before reading its kubeconfig.
@@ -242,10 +313,10 @@ resource "null_resource" "wait_control_plane" {
   }
 
   provisioner "local-exec" {
-    command = "kubectl --kubeconfig=${var.cluster_k0smotron_kubeconfig} -n ${var.cluster_k0smotron_namespace} wait --for=condition=ControlPlaneReady --timeout=15m k0smotroncontrolplane/${var.cluster_name}"
+    command = "kubectl --kubeconfig=${var.cluster_k0smotron_kubeconfig} -n ${var.cluster_k0smotron_namespace} wait --for=condition=ControlPlaneAvailable --timeout=15m cluster/${var.cluster_name}"
   }
 
-  depends_on = [kubernetes_manifest.k0smotron_controlplane]
+  depends_on = [kubectl_manifest.k0smotron_controlplane]
 }
 
 data "kubernetes_secret" "workload_kubeconfig" {
@@ -253,7 +324,7 @@ data "kubernetes_secret" "workload_kubeconfig" {
 
   metadata {
     name      = "${var.cluster_name}-kubeconfig"
-    namespace = var.cluster_k0smotron_namespace
+    namespace = data.kubernetes_namespace.k0smotron[0].metadata[0].name
   }
 
   depends_on = [null_resource.wait_control_plane]

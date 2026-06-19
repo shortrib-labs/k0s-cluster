@@ -15,6 +15,10 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.30"
     }
+    kubectl = {
+      source  = "alekc/kubectl"
+      version = "~> 2.0"
+    }
     tls = {
       source  = "hashicorp/tls"
       version = "~> 4.0"
@@ -37,4 +41,9 @@ provider "nutanix" {
 
 provider "kubernetes" {
   config_path = var.cluster_k0smotron_kubeconfig != "" ? var.cluster_k0smotron_kubeconfig : null
+}
+
+provider "kubectl" {
+  config_path      = var.cluster_k0smotron_kubeconfig != "" ? var.cluster_k0smotron_kubeconfig : null
+  load_config_file = var.cluster_k0smotron_kubeconfig != ""
 }
