@@ -1,15 +1,6 @@
 tfvars := ${SECRETS_DIR}/terrform.tfvars
 params_yaml := ${SECRETS_DIR}/params.yaml
 
-# Set VERBOSE=1 to echo every recipe line (useful for debugging Make targets).
-# By default recipes run silently (each line prefixed with $(Q) which expands
-# to "@").
-ifeq ($(VERBOSE),1)
-Q :=
-else
-Q := @
-endif
-
 cluster_name := $(shell yq .cluster_name $(params_yaml))
 domain := $(shell yq .domain $(params_yaml))
 cluster_fqdn := $(cluster_name).$(domain)
@@ -40,7 +31,7 @@ enable_gvisor = "$(shell yq '.cluster.runtimes.gvisor.enabled // false' $(params
 enable_wasm = "$(shell yq '.cluster.runtimes.wasm.enabled // false' $(params_yaml))"
 
 cluster_mode = "$(shell yq ".cluster.mode // \"vm\"" $(params_yaml))"
-cluster_k0smotron_kubeconfig = "$(shell yq ".cluster.k0smotron.management_kubeconfig // \"\"" $(params_yaml))"
+cluster_k0smotron_kubeconfig = "$(PROJECT_DIR)/$(shell yq ".cluster.k0smotron.management_kubeconfig // \"\"" $(params_yaml))"
 cluster_k0smotron_namespace = "$(shell yq ".cluster.k0smotron.namespace // \"clusters\"" $(params_yaml))"
 cluster_k0smotron_external_ip = "$(shell yq ".cluster.k0smotron.external_ip // \"\"" $(params_yaml))"
 cluster_version = "$(shell yq ".cluster.version // \"1.35.2+k0s.0\"" $(params_yaml))"
@@ -68,60 +59,47 @@ tfvars: $(tfvars)
 
 export TFVARS
 $(tfvars): $(params_yaml)
-	$(Q)echo "$$TFVARS" > $@
+	@echo "$$TFVARS" > $@
 
 .PHONY: init
 init: $(tfvars)
-	$(Q)(cd $(SOURCE_DIR)/terraform && terraform init)
-
-.PHONY: check-mode-switch
-check-mode-switch:
-	$(Q)$(PROJECT_DIR)/bin/check-mode-switch.sh "$(cluster_mode)" "$(SOURCE_DIR)/terraform"
+	@(cd $(SOURCE_DIR)/terraform && terraform init)
 
 .PHONY: nodes
-nodes: $(tfvars) check-mode-switch
-	$(Q)(cd ${SOURCE_DIR}/terraform && terraform apply -var-file $(tfvars) --auto-approve)
+nodes: $(tfvars)
+	@(cd ${SOURCE_DIR}/terraform && terraform apply -var-file $(tfvars) --auto-approve)
 
-ifeq ($(cluster_mode),k0smotron)
 .PHONY: cluster
 cluster: nodes
-	$(Q)$(MAKE) post-cluster
-else
-.PHONY: cluster
-cluster: nodes
-	$(Q)k0sctl apply --config ${SECRETS_DIR}/k0sctl.yaml
-	$(Q)k0sctl kubeconfig --config ${SECRETS_DIR}/k0sctl.yaml > ${SECRETS_DIR}/kubeconfig
-	$(Q)$(MAKE) post-cluster
-endif
-
-.PHONY: post-cluster
-post-cluster:
-	$(Q)export KUBECONFIG=${SECRETS_DIR}/kubeconfig && tailscale configure kubeconfig $(cluster_name)-operator
-	$(Q)yq -i '.contexts[] |= (select(.name == "$(cluster_name)-operator.walrus-shark.ts.net").name = "tailscale-auth@$(cluster_name)" // .) | .contexts[] |= (select(.name == "$(cluster_name)").name = "$(cluster_name)-admin@$(cluster_name)" // .) | .contexts[] |= (select(.context.user == "admin").context.user = "$(cluster_name)-admin" // .) | .users[] |= (select(.name == "admin").name = "$(cluster_name)-admin" // .) | .current-context = "$(cluster_name)-admin@$(cluster_name)"' ${SECRETS_DIR}/kubeconfig
+	@if [ "$(cluster_mode)" = "vm" ]; then \
+	  k0sctl apply --config ${SECRETS_DIR}/k0sctl.yaml && \
+	  k0sctl kubeconfig --config ${SECRETS_DIR}/k0sctl.yaml > ${SECRETS_DIR}/kubeconfig; \
+	fi
+	@export KUBECONFIG=${SECRETS_DIR}/kubeconfig && tailscale configure kubeconfig $(cluster_name)-operator
+	@yq -i '.clusters[] |= (select(.name == "$(cluster_name)-k0s").name = "$(cluster_name)" // .) | .contexts[] |= (select(.context.cluster == "$(cluster_name)-k0s").context.cluster = "$(cluster_name)" // .) | .contexts[] |= (select(.context.user == "admin").context.user = "$(cluster_name)-admin" // .) | .contexts[] |= (select(.name == "$(cluster_name)").name = "$(cluster_name)-admin@$(cluster_name)" // .) | .contexts[] |= (select(.name == "$(cluster_name)-admin@$(cluster_name)-k0s").name = "$(cluster_name)-admin@$(cluster_name)" // .) | .contexts[] |= (select(.name == "$(cluster_name)-operator.walrus-shark.ts.net").name = "tailscale-auth@$(cluster_name)" // .) | .users[] |= (select(.name == "admin").name = "$(cluster_name)-admin" // .) | .current-context = "$(cluster_name)-admin@$(cluster_name)"' ${SECRETS_DIR}/kubeconfig
 
 .PHONY: test
 test: $(tfvars)
-	$(Q)if [ "$(cluster_mode)" = "k0smotron" ]; then \
+	@if [ "$(cluster_mode)" = "k0smotron" ]; then \
 	  test -n "$(cluster_k0smotron_kubeconfig)" || (echo "ERROR: cluster.k0smotron.management_kubeconfig is unset"; exit 1); \
 	  kubectl --kubeconfig=$(cluster_k0smotron_kubeconfig) cluster-info; \
 	fi
-	$(Q)(cd ${SOURCE_DIR}/terraform && terraform plan -var-file $(tfvars))
+	@(cd ${SOURCE_DIR}/terraform && terraform plan -var-file $(tfvars))
 
 .PHONY: destroy
 destroy: $(tfvars)
-	$(Q)# Remove worker host keys before destroying (IPs will be gone after)
-	$(Q)(cd ${SOURCE_DIR}/terraform && terraform state list 2>/dev/null | grep nutanix_virtual_machine | xargs -I{} terraform state show {} 2>/dev/null | grep -oP 'ip\s*=\s*"\K[^"]+' | xargs -I{} ssh-keygen -R {} 2>/dev/null || true)
-	$(Q)if [ "$(cluster_mode)" = "vm" ]; then ssh-keygen -R $(cluster_fqdn) 2>/dev/null || true; fi
-	$(Q)if [ "$(cluster_mode)" = "k0smotron" ]; then (cd ${SOURCE_DIR}/terraform && terraform destroy -var-file $(tfvars) --auto-approve -target='kubernetes_manifest.k0smotron_remotemachine'); fi
-	$(Q)(cd ${SOURCE_DIR}/terraform && terraform destroy -var-file $(tfvars) --auto-approve)
+	@# Remove worker host keys before destroying (IPs will be gone after)
+	@(cd ${SOURCE_DIR}/terraform && terraform state list 2>/dev/null | grep nutanix_virtual_machine | xargs -I{} terraform state show {} 2>/dev/null | grep -oP 'ip\s*=\s*"\K[^"]+' | xargs -I{} ssh-keygen -R {} 2>/dev/null || true)
+	@if [ "$(cluster_mode)" = "vm" ]; then ssh-keygen -R $(cluster_fqdn) 2>/dev/null || true; fi
+	@(cd ${SOURCE_DIR}/terraform && terraform destroy -var-file $(tfvars) --auto-approve)
 
 clean:
-	$(Q)rm $(tfvars)
+	@rm $(tfvars)
 
 .PHONY: encrypt
 encrypt:
-	$(Q)sops --encrypt --in-place $(params_yaml)
+	@sops --encrypt --in-place $(params_yaml)
 
 .PHONY: decrypt
 decrypt:
-	$(Q)sops --decrypt --in-place $(params_yaml)
+	@sops --decrypt --in-place $(params_yaml)
