@@ -7,4 +7,4 @@ spec:
   ipAddressPools:
   - default
   interfaces:
-  - ens224
+  - ens4
